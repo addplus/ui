@@ -2,7 +2,8 @@
   :source-paths #{"src"}
   :test-paths   #{"tst"}
   :target-path  "tgt"
-  :dependencies '[[org.clojure/clojure       "1.8.0"          :scope "provided"]
+  :dependencies '[[darongmean/boot-lein-generate "0.1.1" :scope "test"]
+                  [org.clojure/clojure       "1.8.0"          :scope "provided"]
                   [org.clojure/clojurescript "1.9.89"         :scope "provided"]
                   [adzerk/boot-cljs          "1.7.228-1"      :scope "test"]
                   [adzerk/boot-reload        "0.4.11"         :scope "test"]
@@ -13,6 +14,9 @@
                   [cljsjs/markdown           "0.6.0-beta1-0"]]
   :repositories  [["clojars"       "https://clojars.org/repo/"]
                   ["maven-central" "https://repo1.maven.org/maven2/"]])
+
+(require '[darongmean.boot-lein-generate :refer [lein-generate]])
+(lein-generate)
 
 (require
   '[adzerk.bootlaces          :refer :all]

@@ -4,7 +4,7 @@
     [clojure.string  :refer [blank? join split ends-with?]]
     [cljs.reader     :refer [read-string]]
     [javelin.core    :refer [cell cell?]]
-    [hoplon.ui.attrs :refer [r ratio? calc? ->attr]]
+    [hoplon.ui.attrs :refer [r em ratio? calc? ->attr]]
     [hoplon.ui.elems :refer [box doc out mid in elem? markdown?]]
     [hoplon.ui.validation :as v])
   (:require-macros
@@ -374,7 +374,7 @@
         (.addEventListener (in e) "change" #(when data (swap! data assoc (read-string (.-name (in e))) (not-empty (.-value (in e))))))
         (.addEventListener (in e) "keyup"  (debounce 800 #(when data (swap! data assoc (read-string (.-name (in e))) (not-empty (.-value (in e)))))))
         (bind-in! e [in .-name]     (cell= (pr-str key)))
-        (bind-in! e [in .-value]    val)
+        (bind-in! e [in .-value]    (or val (cell= (get data key))))
         (bind-in! e [in .-required] (cell= (when req :required)))
         (bind-in! e [in .-autofocus] autofocus)))))
 
@@ -384,11 +384,31 @@
     (let [data *data*]
       (swap! *data* assoc key (or val false))
       (with-let [e (ctor (dissoc attrs :key :val :req) elems)]
-        (.addEventListener (in e) "change" #(when data (swap! data assoc (read-string (.-name (in e))) (.-checked (in e)))))
-        (bind-in! e [in .-type]     "checkbox")
-        (bind-in! e [in .-name]     (cell= (pr-str key)))
+        (.addEventListener
+          (in e) "change"
+          #(when data (swap! data assoc
+                             (read-string (.-name (in e)))
+                             (.-checked (in e)))))
+        (bind-in! e [in .-type] "checkbox")
+        (bind-in! e [in .-name] (cell= (pr-str key)))
         (bind-in! e [in .-required] req)
-        (bind-in! e [in .-checked]  val)))))
+        (bind-in! e [in .-checked] val)))))
+
+(defn radioable [ctor]
+  (fn [{:keys [key val req] :as attrs} elems]
+    ;{:pre []} todo: validate
+    (let [data *data*]
+      (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
+        (.addEventListener
+          (in e) "change"
+          #(when data (swap! data assoc
+                             (read-string (.-name (in e)))
+                             (read-string (.-value (in e))))))
+        (set! (.-checked (in e)) (= (get @data key) val))
+        (bind-in! e [in .-type] "radio")
+        (bind-in! e [in .-name] (cell= (pr-str key)))
+        (bind-in! e [in .-required] req)
+        (bind-in! e [in .-value] (cell= (pr-str val)))))))
 
 (defn file-field [ctor]
   (fn [{:keys [accept] :as attrs} elems]
@@ -615,6 +635,7 @@
 
 (def form*   (-> h/form        box assert-noattrs         formidable             node            parse-args))
 (def toggle  (-> h/input       box assert-noattrs destyle toggleable             node            parse-args))
+(def radio   (-> h/input       box assert-noattrs destyle                        node radioable  parse-args))
 (def file    (-> h/input       box assert-noattrs destyle fieldable   file-field node            parse-args))
 (def text    (-> h/input       box assert-noattrs destyle fieldable   text-field node            parse-args))
 (def submit  (-> h/input       box assert-noattrs destyle submittable            node            parse-args))
