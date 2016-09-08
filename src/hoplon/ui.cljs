@@ -364,15 +364,26 @@
     (let [data *data*]
       (when change (cell= (change (clean data))))
       (with-let [e (ctor (dissoc attrs :change :submit) elems)]
-        (.addEventListener (in e) "keypress" #(when (= (.-which %) 13) (submit (clean @data))))))))
+        (.addEventListener (in e) "keypress" #(when (= (.-which %) 13)
+                                               (.preventDefault %)
+                                               (submit (clean @data))))))))
 
 (defn fieldable [ctor]
   (fn [{:keys [key val req autofocus] :as attrs} elems]
     ;{:pre []} todo: validate
     (let [data *data*]
       (with-let [e (ctor (dissoc attrs :key :val :req :autofocus) elems)]
-        (.addEventListener (in e) "change" #(when data (swap! data assoc (read-string (.-name (in e))) (not-empty (.-value (in e))))))
-        (.addEventListener (in e) "keyup"  (debounce 800 #(when data (swap! data assoc (read-string (.-name (in e))) (not-empty (.-value (in e)))))))
+        (.addEventListener (in e) "change"
+                           #(when data
+                             (swap! data assoc
+                                    (read-string (.-name (in e)))
+                                    (not-empty (.-value (in e))))))
+        (.addEventListener (in e) "keyup"
+                           #(when data
+                             (swap! data assoc
+                                    (read-string (.-name (in e)))
+                                    (not-empty (.-value (in e))))))
+
         (bind-in! e [in .-name]     (cell= (pr-str key)))
         (bind-in! e [in .-value]    (or val (cell= (get data key))))
         (bind-in! e [in .-required] (cell= (when req :required)))
