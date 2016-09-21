@@ -394,7 +394,7 @@
     ;{:pre []} todo: validate
     (let [data *data*]
       (swap! *data* assoc key (or val false))
-      (with-let [e (ctor (dissoc attrs :key :val :req) elems)]
+      (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
         (.addEventListener
           (in e) "change"
           #(when data (swap! data assoc
@@ -658,7 +658,7 @@
 (def window* (->               doc assert-noattrs                                node windowable parse-args))
 
 (def form*   (-> h/form        box assert-noattrs         formidable             node            parse-args))
-(def toggle  (-> h/input       box assert-noattrs destyle toggleable             node            parse-args))
+(def toggle  (-> h/input       box assert-noattrs destyle                        node toggleable parse-args))
 (def radio   (-> h/input       box assert-noattrs destyle                        node radioable  parse-args))
 (def select  (-> h/select      box assert-noattrs destyle                        node selectable parse-args))
 (def file    (-> h/input       box assert-noattrs destyle fieldable   file-field node            parse-args))
