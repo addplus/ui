@@ -449,6 +449,19 @@
         (bind-in! e [in .-type]  "button")
         (bind-in! e [in .-value] label)))))
 
+(defn selectable [ctor]
+  (fn [{:keys [key req] :as attrs} kids]
+    (let [data *data*]
+      (with-let [e (ctor (dissoc attrs :key :req))]
+        ((in e) kids)
+        (.addEventListener
+          (in e) "change"
+          #(when data (swap! data assoc
+                             (read-string (.-name (in e)))
+                             (read-string (.-value (in e))))))
+        (bind-in! e [in .-name] (cell= (pr-str key)))
+        (bind-in! e [in .-required] req)))))
+
 ;;; middlewares ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn exceptional [ctor]
@@ -647,6 +660,7 @@
 (def form*   (-> h/form        box assert-noattrs         formidable             node            parse-args))
 (def toggle  (-> h/input       box assert-noattrs destyle toggleable             node            parse-args))
 (def radio   (-> h/input       box assert-noattrs destyle                        node radioable  parse-args))
+(def select  (-> h/select      box assert-noattrs destyle                        node selectable parse-args))
 (def file    (-> h/input       box assert-noattrs destyle fieldable   file-field node            parse-args))
 (def text    (-> h/input       box assert-noattrs destyle fieldable   text-field node            parse-args))
 (def submit  (-> h/input       box assert-noattrs destyle submittable            node            parse-args))
