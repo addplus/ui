@@ -583,7 +583,7 @@
           (bind-in! e [mid .-style .-width]     "100%")
           (bind-in! e [mid .-style .-margin]    "0")
           (bind-in! e [mid .-style .-fontSize]  "100%")
-          (bind-in! e [out .-style .-overflow] (cell= (when-not scroll "hidden")))
+          #_(bind-in! e [out .-style .-overflow] (cell= (when-not scroll "hidden")))
           (when initiated
             (initiated (get-route) (get-status) (get-agent) (get-refer)))
           (when routechanged
