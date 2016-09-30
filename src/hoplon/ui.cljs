@@ -261,10 +261,11 @@
         (bind-in! e [mid .-style .-opacity]          o)
         (bind-in! e [mid .-style .-cursor]           m)
         (bind-in! e [out .-style .-visibility]       (cell= (when (and (contains? attrs :v) (not v)) :hidden)))
-        (bind-in! e [in  .-style .-userSelect]       l)
-        (bind-in! e [in  .-style .-mozUserSelect]    l)
-        (bind-in! e [in  .-style .-msUserSelect]     l)
-        (bind-in! e [in  .-style .-webkitUserSelect] l)))))
+        ;(bind-in! e [in  .-style .-userSelect]       l)
+        ;(bind-in! e [in  .-style .-mozUserSelect]    l)
+        ;(bind-in! e [in  .-style .-msUserSelect]     l)
+        ;(bind-in! e [in  .-style .-webkitUserSelect] l)
+        ))))
 
 (defn transform [ctor]
   "apply a taransformation on the outer element."
