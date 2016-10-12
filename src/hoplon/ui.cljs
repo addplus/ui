@@ -411,14 +411,14 @@
 (defn radioable [ctor]
   (fn [{:keys [key val req] :as attrs} elems]
     ;{:pre []} todo: validate
-    (let [data *data*]
+    (let [data *data*
+          key-vec (if (vector? key) key [key])]
       (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
         (.addEventListener
           (in e) "change"
-          #(when data (swap! data assoc
-                             (read-string (.-name (in e)))
+          #(when data (swap! data assoc-in key-vec
                              (read-string (.-value (in e))))))
-        (set! (.-checked (in e)) (= (get @data key) val))
+        (set! (.-checked (in e)) (= (get-in @data key-vec) val))
         (bind-in! e [in .-type] "radio")
         (bind-in! e [in .-name] (cell= (pr-str key)))
         (bind-in! e [in .-required] req)
