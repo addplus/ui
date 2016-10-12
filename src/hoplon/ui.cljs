@@ -374,21 +374,20 @@
 (defn fieldable [ctor]
   (fn [{:keys [key val req autofocus] :as attrs} elems]
     ;{:pre []} todo: validate
-    (let [data *data*]
+    (let [data *data*
+          key-vec (if (vector? key) key [key])]
       (with-let [e (ctor (dissoc attrs :key :val :req :autofocus) elems)]
         (.addEventListener (in e) "change"
                            #(when data
-                             (swap! data assoc
-                                    (read-string (.-name (in e)))
+                             (swap! data assoc-in key-vec
                                     (not-empty (.-value (in e))))))
         (.addEventListener (in e) "keyup"
                            #(when data
-                             (swap! data assoc
-                                    (read-string (.-name (in e)))
+                             (swap! data assoc-in key-vec
                                     (not-empty (.-value (in e))))))
 
         (bind-in! e [in .-name]     (cell= (pr-str key)))
-        (bind-in! e [in .-value]    (or val (cell= (get data key))))
+        (bind-in! e [in .-value]    (or val (cell= (get-in data key-vec))))
         (bind-in! e [in .-required] (cell= (when req :required)))
         (bind-in! e [in .-autofocus] autofocus)))))
 
@@ -454,13 +453,13 @@
 
 (defn selectable [ctor]
   (fn [{:keys [key req] :as attrs} kids]
-    (let [data *data*]
+    (let [data *data*
+          key-vec (if (vector? key) key [key])]
       (with-let [e (ctor (dissoc attrs :key :req))]
         ((in e) kids)
         (.addEventListener
           (in e) "change"
-          #(when data (swap! data assoc
-                             (read-string (.-name (in e)))
+          #(when data (swap! data assoc-in key-vec
                              (read-string (.-value (in e))))))
         (bind-in! e [in .-name] (cell= (pr-str key)))
         (bind-in! e [in .-required] req)))))
