@@ -394,13 +394,13 @@
 (defn toggleable [ctor]
   (fn [{:keys [key val req] :as attrs} elems]
     ;{:pre []} todo: validate
-    (let [data *data*]
-      (swap! *data* assoc key (or val false))
+    (let [data *data*
+          key-vec (if (vector? key) key [key])]
+      (swap! *data* assoc-in key-vec (or val false))
       (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
         (.addEventListener
           (in e) "change"
-          #(when data (swap! data assoc
-                             (read-string (.-name (in e)))
+          #(when data (swap! data assoc-in key-vec
                              (.-checked (in e)))))
         (bind-in! e [in .-type] "checkbox")
         (bind-in! e [in .-name] (cell= (pr-str key)))
