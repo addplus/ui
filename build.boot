@@ -1,34 +1,59 @@
+; To inform IntelliJ explicitely about deftask, set-env!, task-options!
+(require '[boot.core :refer :all]
+         '[boot.task.built-in :refer :all])
+
+(def +version+ "0.1.0-SNAPSHOT")
+
+(task-options!
+  pom    {:project     'hoplon/ui
+          :version     +version+
+          :description "a cohesive layer of composable abstractions over the dom."
+          :url         "https://github.com/hoplon/ui"
+          :scm         {:url "https://github.com/hoplon/ui"}
+          :license     {"EPL" "http://www.eclipse.org/legal/epl-v10.html"}})
+
 (set-env!
   :source-paths #{"src"}
   :test-paths   #{"tst"}
-  :target-path  "tgt"
-  :dependencies '[[darongmean/boot-lein-generate "0.1.1" :scope "test"]
-                  [org.clojure/clojure       "1.8.0"          :scope "provided"]
-                  [org.clojure/clojurescript "1.9.89"         :scope "provided"]
-                  [adzerk/boot-cljs          "1.7.228-1"      :scope "test"]
-                  [adzerk/boot-reload        "0.4.11"         :scope "test"]
+  :dependencies '[[boot/core                 "2.6.0"]
+                  [onetom/boot-lein-generate "0.1.3"          :scope "test"]
+                  [org.clojure/clojure       "1.9.0-alpha13"  :scope "provided"]
+                  [org.clojure/clojurescript "1.9.293"        :scope "provided"]
+                  [adzerk/boot-cljs          "1.7.228-2"      :scope "test"]
+                  [adzerk/boot-reload        "0.4.12"         :scope "test"]
                   [adzerk/bootlaces          "0.1.13"         :scope "test"]
-                  [hoplon/boot-hoplon        "0.2.0"          :scope "test"]
                   [tailrecursion/boot-static "0.0.1-SNAPSHOT" :scope "test"]
-                  [hoplon/hoplon             "6.0.0-alpha16"]
-                  [cljsjs/markdown           "0.6.0-beta1-0"]]
+                  [hoplon/hoplon             "6.0.0-alpha17"]
+                  [cljsjs/markdown           "0.6.0-beta1-0"]
+
+                  [binaryage/devtools "0.8.2"                 :scope "test"]
+                  [binaryage/dirac "0.8.4"                    :scope "test"]
+                  [powerlaces/boot-cljs-devtools "0.1.2"      :scope "test"]]
   :repositories  [["clojars"       "https://clojars.org/repo/"]
                   ["maven-central" "https://repo1.maven.org/maven2/"]])
 
-(require '[darongmean.boot-lein-generate :refer [lein-generate]])
-(lein-generate)
+(require 'boot.lein)
+(boot.lein/generate)
 
 (require
   '[adzerk.bootlaces          :refer :all]
   '[adzerk.boot-cljs          :refer [cljs]]
   '[adzerk.boot-reload        :refer [reload]]
   '[hoplon.boot-hoplon        :refer [hoplon]]
-  '[tailrecursion.boot-static :refer [serve]])
-
-(def +version+ "0.0.1-SNAPSHOT")
+  '[tailrecursion.boot-static :refer [serve]]
+  '[powerlaces.boot-cljs-devtools :refer [cljs-devtools]])
 
 (bootlaces! +version+)
 
+(def devtools-config
+  {:features-to-install           [:formatters :hints :async]
+   :dont-detect-custom-formatters true})
+
+(task-options!
+  serve {:port 5000}
+  cljs {:optimizations    :none
+        :compiler-options {:parallel-build  true
+                           :external-config {:devtools/config devtools-config}}})
 (deftask develop []
   (comp (watch) (speak) (build-jar)))
 
@@ -39,13 +64,4 @@
   (as-> (get-env) $
         (clojure.set/union (:source-paths $) (:test-paths $))
         (set-env! :source-paths $))
-  (comp (watch) (speak) (hoplon) (reload) (cljs :optimizations :none) (serve)))
-
-(task-options!
-  pom    {:project     'hoplon/ui
-          :version     +version+
-          :description "a cohesive layer of composable abstractions over the dom."
-          :url         "https://github.com/hoplon/ui"
-          :scm         {:url "https://github.com/hoplon/ui"}
-          :license     {"EPL" "http://www.eclipse.org/legal/epl-v10.html"}}
-  serve  {:port        5000})
+  (comp (watch) (speak) (hoplon) (reload) (cljs-devtools) (cljs :optimizations :none) (serve)))

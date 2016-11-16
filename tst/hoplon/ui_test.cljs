@@ -1,6 +1,4 @@
-(ns+ hoplon.ui-test
-  (:page
-    "index.html")
+(ns ^{:hoplon/page "index.html"} hoplon.ui-test
   (:refer-clojure
     :exclude [- test])
   (:require
