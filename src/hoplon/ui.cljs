@@ -1,16 +1,20 @@
 (ns hoplon.ui
+  (:refer-clojure :exclude [binding bound-fn])
   (:require
     [hoplon.core :as h]
     [clojure.string  :refer [blank? join split ends-with?]]
     [cljs.reader     :refer [read-string]]
     [javelin.core    :refer [cell cell?]]
     [hoplon.ui.attrs :refer [r em ratio? calc? ->attr]]
-    [hoplon.ui.elems :refer [box doc out mid in elem? markdown?]]
-    [hoplon.ui.validation :as v])
+    [hoplon.ui.elems :refer [box doc out mid in elem?]]
+    [hoplon.ui.validation :as v]
+    [hoplon.binding]
+    [cljsjs.markdown])
   (:require-macros
-    [hoplon.core  :refer [with-timeout]]
-    [hoplon.ui    :refer [bind-in!]]
-    [javelin.core :refer [cell= with-let set-cell!=]]))
+    [hoplon.core    :refer [with-timeout]]
+    [hoplon.binding :refer [binding bound-fn]]
+    [hoplon.ui      :refer [bind-in!]]
+    [javelin.core   :refer [cell= with-let set-cell!=]]))
 
 ;;; constants ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -28,8 +32,7 @@
 (defn route->hash [[path & [qmap]]]
   "transforms a urlstate of the form [[\"foo\" \"bar\"] {:baz \"barf\"}]
    to hash string in the form \"foo/bar&baz=barf\""
-  (let [pair (fn [[k v]]
-                 (str (name k) "=" (js/encodeURI (pr-str v))))
+  (let [pair (fn [[k v]] (str (name k) "=" (js/encodeURI (pr-str v))))
         pstr (when (not-empty path) (apply str "/" (interpose "/" (map name path))))
         qstr (when (not-empty qmap) (apply str "?" (interpose "&" (map pair qmap))))]
     (str pstr qstr)))
@@ -46,14 +49,22 @@
 
 (defn clean [map] (into {} (filter second map)))
 
+(defn copy! [text]
+  (let [foc (.-activeElement js/document)
+        tgt (with-let [e (.createElement js/document "textarea")]
+              (set! (.-value e) text))]
+    (.appendChild (.-body js/document) tgt)
+    (.focus tgt)
+    (.setSelectionRange tgt 0 (.. tgt -value -length))
+    (.execCommand js/document "copy")
+    (.focus foc)
+    (.removeChild (.-body js/document) tgt)))
+
 (defn debounce [ms f]
-  (let [queued? (atom false)]
+  (let [id (atom nil)]
     (fn [& args]
-      (when-not @queued?
-        (reset! queued? true)
-        (with-timeout ms
-          (reset! queued? false)
-          (apply f args))))))
+      (js/clearTimeout @id)
+      (reset! id (js/setTimeout #(apply f args) ms)))))
 
 (def visibility->status
   "maps the visibility string to a status keyword"
@@ -81,12 +92,11 @@
     (f (map-indexed watch vs))))
 
 (defn swap-elems! [e f & vs] ;; todo: factor out
-  (cond (cell?     e) (cell= (apply swap-elems! e f vs))
-        (vector?   e) (doseq [e e] (apply swap-elems! e f vs)) ;;todo: handled with IElemValue if (hoplon.ui/elem?)
-        (elem?     e) (apply f e vs)
-        (markdown? e) identity
-        (string?   e) identity
-        (nil?      e) identity
+  (cond (cell?       e) (cell= (apply swap-elems! e f vs))
+        (sequential? e) (doseq [e e] (apply swap-elems! e f vs)) ;;todo: handled with IElemValue if (hoplon.ui/elem?)
+        (elem?       e) (apply f e vs)
+        (string?     e) identity
+        (nil?        e) identity
         (fn?       e) identity
         :else       (throw-ui-exception "Invalid child of type " (type e) " with values " vs ".")))
 
@@ -112,6 +122,7 @@
 (def cursors?         (validate-cells v/cursor?         "Error validating attribute of type cursor with value"))
 (def decorations?     (validate-cells v/decoration?     "Error validating attribute of type decoration with value"))
 (def families?        (validate-cells v/family?         "Error validating attribute of type family with value"))
+(def fits?            (validate-cells v/fit?            "Error validating attribute of type fit with value"))
 (def kernings?        (validate-cells v/kerning?        "Error validating attribute of type kerning with value"))
 (def lengths?         (validate-cells v/length?         "Error validating attribute of type length with value"))
 (def opacities?       (validate-cells v/opacity?        "Error validating attribute of type opacity with value"))
@@ -192,7 +203,7 @@
           av (cell= ({:beg :top  :mid :middle :end :bottom}              (or av a) (or av a)))]
       (swap-elems! elems #(bind-in! %1 [out .-style .-verticalAlign] %2) (cell= (or av :top)))
       (with-let [e (ctor (dissoc attrs :a :ah :av) elems)]
-        (bind-in! e [in  .-style .-height]        (cell= (if av :auto "100%")))
+        (bind-in! e [in  .-style .-height]        (cell= (if av :auto "100%"))) ;; height is 100% only when based on size of children
         (bind-in! e [mid .-style .-textAlign]     ah)
         (bind-in! e [mid .-style .-verticalAlign] av)
         (when (= (-> e in .-style .-position) "absolute")
@@ -209,7 +220,7 @@
     (with-let [e (ctor (dissoc attrs :p :ph :pv :pl :pr :pt :pb) elems)]
       (bind-in! e [mid .-style .-padding] (or pt pv p 0) (or pr ph p 0) (or pb pv p 0) (or pl ph p 0)))))
 
-(defn space [ctor]
+(defn gutter [ctor]
   "set the padding on the outer element of each child and a negative margin on
    the inner element of the elem itself equal to the padding.
 
@@ -261,11 +272,10 @@
         (bind-in! e [mid .-style .-opacity]          o)
         (bind-in! e [mid .-style .-cursor]           m)
         (bind-in! e [out .-style .-visibility]       (cell= (when (and (contains? attrs :v) (not v)) :hidden)))
-        ;(bind-in! e [in  .-style .-userSelect]       l)
-        ;(bind-in! e [in  .-style .-mozUserSelect]    l)
-        ;(bind-in! e [in  .-style .-msUserSelect]     l)
-        ;(bind-in! e [in  .-style .-webkitUserSelect] l)
-        ))))
+        (bind-in! e [in  .-style .-userSelect]       l)
+        (bind-in! e [in  .-style .-mozUserSelect]    l)
+        (bind-in! e [in  .-style .-msUserSelect]     l)
+        (bind-in! e [in  .-style .-webkitUserSelect] l)))))
 
 (defn transform [ctor]
   "apply a taransformation on the outer element."
@@ -360,109 +370,123 @@
 (def ^:dynamic *error*  nil)
 (def ^:dynamic *submit* nil)
 
-(defn formidable [ctor]
+(defn formable [ctor]
   "set up a form context"
   (fn [{:keys [change submit] :as attrs} elems]
-    (reset! *submit* submit)
-    (let [data *data*]
-      (when change (cell= (change (clean data))))
-      (with-let [e (ctor (dissoc attrs :change :submit) elems)]
-        (.addEventListener (in e) "keypress" #(when (= (.-which %) 13)
-                                               (.preventDefault %)
-                                               (submit (clean @data))))))))
+    (when change (cell= (change (clean *data*)))) ;; init *data* to value of form fields on render
+     (with-let [e (ctor (dissoc attrs :change :submit) elems)]
+       (->> (bound-fn [e]
+              (when (= (.-which e) 13)
+                #_(.preventDefault %)                       ; FIXME Why is it needed?
+                (submit (clean @*data*))))
+            (.addEventListener (in e) "keypress")))))
 
 (defn fieldable [ctor]
+  "set the values common to all form fields."
   (fn [{:keys [key val req autofocus] :as attrs} elems]
-    ;{:pre []} todo: validate
-    (let [data *data*
-          key-vec (if (vector? key) key [key])]
-      (with-let [e (ctor (dissoc attrs :key :val :req :autofocus) elems)]
-        (.addEventListener (in e) "change"
-                           #(when data
-                             (swap! data assoc-in key-vec
-                                    (not-empty (.-value (in e))))))
-        (.addEventListener (in e) "keyup"
-                           #(when data
-                             (swap! data assoc-in key-vec
-                                    (not-empty (.-value (in e))))))
-
-        (bind-in! e [in .-name]     (cell= (pr-str key)))
-        (bind-in! e [in .-value]    (or val (cell= (get-in data key-vec))))
-        (bind-in! e [in .-required] (cell= (when req :required)))
-        (bind-in! e [in .-autofocus] autofocus)))))
-
-(defn toggleable [ctor]
-  (fn [{:keys [key val req] :as attrs} elems]
-    ;{:pre []} todo: validate
-    (let [data *data*
-          key-vec (if (vector? key) key [key])]
-      (swap! *data* assoc-in key-vec (or val false))
-      (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
-        (.addEventListener
-          (in e) "change"
-          #(when data (swap! data assoc-in key-vec
-                             (.-checked (in e)))))
-        (bind-in! e [in .-type] "checkbox")
-        (bind-in! e [in .-name] (cell= (pr-str key)))
-        (bind-in! e [in .-required] req)
-        (bind-in! e [in .-checked] val)))))
-
-(defn radioable [ctor]
-  (fn [{:keys [key val req] :as attrs} elems]
-    ;{:pre []} todo: validate
-    (let [data *data*
-          key-vec (if (vector? key) key [key])]
-      (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
-        (.addEventListener
-          (in e) "change"
-          #(when data (swap! data assoc-in key-vec
-                             (read-string (.-value (in e))))))
-        (set! (.-checked (in e)) (= (get-in @data key-vec) val))
-        (bind-in! e [in .-type] "radio")
-        (bind-in! e [in .-name] (cell= (pr-str key)))
-        (bind-in! e [in .-required] req)
-        (bind-in! e [in .-value] (cell= (pr-str val)))))))
+    (let [key-vec (cell= (if (vector? key) key [key]))]
+      (with-let [e (ctor (dissoc attrs :key :val :req :autofocus :debounce) elems)]
+       (let [save (bound-fn [_]
+                    (when *data*
+                      (swap! *data* assoc-in
+                             @key-vec (not-empty (.-value (in e))))))]
+         (.addEventListener (in e) "change" save)
+         (.addEventListener (in e) "keyup" (if-let [deb (:debounce attrs)] (debounce deb save) save))
+         (bind-in! e [in .-name] (cell= (pr-str key-vec)))
+         (bind-in! e [in .-value] val)
+         (bind-in! e [in .-required] (cell= (when req :required)))
+         (bind-in! e [in .-autofocus] autofocus))))))
 
 (defn file-field [ctor]
   (fn [{:keys [accept] :as attrs} elems]
     ;{:pre []} ;accept [".jpg" ".png" "audio/*" "video/*" "image/*" "application/ogg"]
     (with-let [e (ctor (dissoc attrs :accept) elems)]
-      (bind-in! e [in .-type] "file"))))
+      (let [i (.appendChild (mid e) (.createElement js/document "input"))]
+        (bind-in! i [.-style .-position] "absolute")
+        (bind-in! i [.-style .-left]     "0")
+        (bind-in! i [.-style .-width]    "100%")
+        (bind-in! i [.-style .-top]      "0")
+        (bind-in! i [.-style .-bottom]   "0")
+        (bind-in! i [.-style .-opacity]  "0")
+        (bind-in! i [.-type]             "file")
+        (bind-in! (mid e) [.-tabIndex]   "0")
+        (->> (bound-fn [_]
+               (when *data*
+                 (swap! *data* assoc
+                        (read-string (.-name i))
+                        (when (not-empty (.-value i))
+                          {:name (.-value i) :data (.-name (.item (.-files i) 0))})))
+               (when-let [v (not-empty (.-value i))]
+                 (set! (.-innerHTML (in e)) (last (split v #"\\")))))
+             (.addEventListener i "change"))))))
 
-(defn text-field [ctor]
-  (fn [{:keys [autocomplete autocapitalize content prompt charsize charmin charmax] :as attrs} elems]
+(defn pick-field [ctor]
+  (fn [{:keys [selection] :as attrs} elems]
+    (with-let [e (ctor (dissoc attrs :selection) elems)]
+      #_(bind-in! e [in .-name] key))))
+
+(defn picks-field [ctor]
+  (fn [{:keys [selections] :as attrs} elems]
+    (with-let [e (ctor (dissoc attrs :selections) elems)]
+      #_(bind-in! e [in .-name] key))))
+
+(defn item-field [ctor]
+  (fn [{:keys [val] :as attrs} elems]
+    (with-let [e (ctor (dissoc attrs :val) elems)]
+      (bind-in! e [in .-value] (cell= (pr-str val)))
+      (.addEventListener (mid e) "mousedown" (bound-fn [] (when (= *state* :on) nil #_(reset! *selected* val)))))))
+
+(defn items-field [ctor]
+  (fn [{:keys [val] :as attrs} elems]
+    (with-let [e (ctor (dissoc attrs :val) elems)]
+      (bind-in! e [in .-value] (cell= (pr-str val)))
+      (.addEventListener (mid e) "mousedown" (bound-fn [] (if (= *state* :on) nil #_(reset! *selected* val)))))))
+
+(defn line-field [ctor]
+  (fn [{:keys [rows cols autocomplete autocapitalize content prompt charsize charmin charmax resizable] :as attrs} elems]
     {:pre [(autocompletes? autocomplete) (autocapitalizes? autocapitalize) (contents? content) (integers? charsize charmin charmax)]}
-    (with-let [e (ctor (dissoc attrs :autocomplete :autocapitalize :content :prompt :charsize :charmin :charmax) elems)]
-      (bind-in! e [in .-type]           content)
-      (bind-in! e [in .-placeholder]    prompt)
-      (bind-in! e [in .-autocomplete]   autocomplete)
-      (bind-in! e [in .-autocapitalize] autocapitalize)
-      ;(bind-in! e [in .-size]           charsize)
-      (bind-in! e [in .-minlength]      charmin)
-      (bind-in! e [in .-maxlength]      charmax))))
+    (with-let [e (ctor (dissoc attrs :rows :cols :autocomplete :autocapitalize :content :prompt :charsize :charmin :charmax :resizeable) elems)]
+      (bind-in! e [in .-style .-padding] "0")
+      (bind-in! e [in .-rows]            (cell= (if rows (str rows) "1")))
+      (bind-in! e [in .-style .-height]  (cell= (if rows nil "100%")))
+      (bind-in! e [in .-cols]            (cell= (when cols (str cols))))
+      (bind-in! e [in .-style .-width]   (cell= (if cols nil "100%")))
+      (bind-in! e [in .-style .-resize]  (cell= (or resizable :none)))
+      (bind-in! e [in .-type]            content)
+      (bind-in! e [in .-placeholder]     prompt)
+      (bind-in! e [in .-autocomplete]    autocomplete)
+      (bind-in! e [in .-autocapitalize]  autocapitalize)
 
-(defn submittable [ctor]
+      ;(bind-in! e [in .-size]           charsize)
+      (bind-in! e [in .-minlength]       charmin)
+      (bind-in! e [in .-maxlength]       charmax))))
+
+(defn lines-field [ctor]
+  (fn [{:keys [rows cols autocomplete autocapitalize content prompt charsize charmin charmax resizable] :as attrs} elems]
+    {:pre [(autocompletes? autocomplete) (autocapitalizes? autocapitalize) (contents? content) (integers? charsize charmin charmax)]}
+    (with-let [e (ctor (dissoc attrs :rows :cols :autocomplete :autocapitalize :content :prompt :charsize :charmin :charmax :resizeable) elems)]
+      (bind-in! e [in .-style .-padding] "0")
+      (bind-in! e [in .-rows]            (cell= (if rows (str rows) "2")))
+      (bind-in! e [in .-style .-height]  (cell= (if rows nil "100%")))
+      (bind-in! e [in .-cols]            (cell= (when cols (str cols))))
+      (bind-in! e [in .-style .-width]   (cell= (if cols nil "100%")))
+      (bind-in! e [in .-style .-resize]  (cell= (or resizable :none)))
+      (bind-in! e [in .-type]            content)
+      (bind-in! e [in .-placeholder]     prompt)
+      (bind-in! e [in .-autocomplete]    autocomplete)
+      (bind-in! e [in .-autocapitalize]  autocapitalize)
+
+      ;(bind-in! e [in .-size]           charsize)
+      (bind-in! e [in .-minlength]       charmin)
+      (bind-in! e [in .-maxlength]       charmax))))
+
+(defn send-field [ctor]
   (fn [{label :label submit' :submit :as attrs} elems]
     {:pre []} ;; todo: validate
-    (let [data   *data*
-          submit *submit*]
-      (with-let [e (ctor (dissoc attrs :label :submit) elems)]
-        (.addEventListener (mid e) "click" #((or submit' @submit) @data))
-        (bind-in! e [in .-type]  "button")
-        (bind-in! e [in .-value] label)))))
-
-(defn selectable [ctor]
-  (fn [{:keys [key req] :as attrs} kids]
-    (let [data *data*
-          key-vec (if (vector? key) key [key])]
-      (with-let [e (ctor (dissoc attrs :key :req))]
-        ((in e) kids)
-        (.addEventListener
-          (in e) "change"
-          #(when data (swap! data assoc-in key-vec
-                             (read-string (.-value (in e))))))
-        (bind-in! e [in .-name] (cell= (pr-str key)))
-        (bind-in! e [in .-required] req)))))
+    (with-let [e (ctor (dissoc attrs :label :submit) elems)]
+      (.addEventListener (mid e) "click" (bound-fn [_] (or submit' *submit*) *data*))
+      (bind-in! e [in .-type]  "button")
+      (bind-in! e [in .-value] label))))
 
 ;;; middlewares ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -482,59 +506,61 @@
     {:pre [(attrs? attrs)]}
     (ctor attrs elems)))
 
-(defn skin [ctor]
-  "add an svg skin to the component."
-  (fn [attrs elems]
-    (with-let [e (ctor attrs elems)]
-      (let [skin (.createElementNS js/document "http://www.w3.org/2000/svg" "svg")] ;; if skin then hide mid styles
-        (set! (.. skin -style -position) "absolute")
-        (set! (.. skin -style -top)      "0")
-        (set! (.. skin -style -left)     "0")
-        (set! (.. skin -style -width)    "100%")
-        (set! (.. skin -style -height)   "100%")
-        (set! (.. skin -style -zIndex)   "-1")
-        (set! (.. skin -innerHTML)       "<rect x='0' y='0' width='100%' height='100%' rx='10' ry='10' fill='#CCC' />")
-        (.appendChild (mid e) skin)))))
-
-(defn imageable [ctor]
-  "set the size of the absolutely positioned inner elem to the padding"
-  (fn [{:keys [url p ph pv pl pr pt pb] :as attrs} elems]
-    (with-let [e (ctor (dissoc attrs :url) elems)]
-      (let [img (.insertBefore (mid e) (.createElement js/document "img") (in e))]
-        (bind-in! img [.-style .-display]   :block)
-        (bind-in! img [.-style .-position]  :relative)
-        (bind-in! img [.-style .-width]     "100%")
-        (bind-in! img [.-style .-height]    :initial)
-        (bind-in! img [.-src]               url)
-        (bind-in! e [in .-style .-position] :absolute)
-        (bind-in! e [in .-style .-top]      0)
-        (bind-in! e [in .-style .-width]    "100%")))))
+(defn underlay [ctor element-ctor]
+  (fn [{:keys [fit] :as attrs} elems]
+    {:pre [(fits? fit)]}
+    (with-let [e (ctor (dissoc attrs :fit) elems)]
+      (let [u (.insertBefore (mid e) (element-ctor) (in e))
+            f (some #{fit} #{:cover :contain})]
+        (bind-in! u [.-style .-display]      :block)
+        (bind-in! u [.-style .-position]     (cell= (if f :absolute :relative)))
+        (bind-in! u [.-style .-left]         (cell= (when f                 "50%")))
+        (bind-in! u [.-style .-top]          (cell= (when f                 "50%")))
+        (bind-in! u [.-style .-width]        (cell= (when (not= fit :cover) "100%")))
+        (bind-in! u [.-style .-height]       (cell= (when (= fit :fill)     "100%")))
+        (bind-in! u [.-style .-minWidth]     (cell= (when (= fit :cover)    "100%")))
+        (bind-in! u [.-style .-minHeight]    (cell= (when (= fit :cover)    "100%")))
+        (bind-in! u [.-style .-transform]    (cell= (when f                 "translate(-50%,-50%)")))
+        (bind-in! e [mid .-style .-overflow] (cell= (when (= fit :cover) :hidden)))
+        (bind-in! e [in  .-style .-position] :absolute)
+        (bind-in! e [in  .-style .-top]      0)
+        (bind-in! e [in  .-style .-width]    "100%")))))
 
 (defn frameable [ctor]
-  (fn [{:keys [type url] :as attrs} elems]
-    {:pre []} ;; todo: validate
-    (with-let [e (ctor (dissoc attrs :type :url) elems)]
-      (bind-in! e [in .-width]  "100%")
-      (bind-in! e [in .-height] "100%")
-      (bind-in! e [in .-type] type)
-      (bind-in! e [in .-src]  url))))
+  (fn [{:keys [allow-fullscreen sandbox type url] :as attrs} elems]
+    {:pre []} ;; todo
+    (with-let [e (ctor (dissoc attrs :allow-fullscreen :sandbox :type :url) elems)]
+      (bind-in! e [mid .-firstChild .-allowFullscreen] allow-fullscreen)
+      (bind-in! e [mid .-firstChild .-sandbox]         sandbox)
+      (bind-in! e [mid .-firstChild .-type]            type)
+      (bind-in! e [mid .-firstChild .-src]             url))))
+
+(defn imageable [ctor]
+  (fn [{:keys [url] :as attrs} elems]
+    {:pre []} ;; todo
+    (with-let [e (ctor (dissoc attrs :url) elems)]
+      (bind-in! e [mid .-firstChild .-src] url))))
 
 (defn objectable [ctor]
-  (fn [{:keys [type data id xo] :as attrs} elems]
-    {:pre []} ;; todo: validate
-    (with-let [e (ctor (dissoc attrs :type :data :id :xo) elems)]
-      (bind-in! e [in .-type]        type)
-      (bind-in! e [in .-crossOrigin] xo)
-      (bind-in! e [in .-data]        data))))
+  (fn [{:keys [cross-origin type url] :as attrs} elems]
+    {:pre []} ;; todo
+    (with-let [e (ctor (dissoc attrs :cross-origin :type :url) elems)]
+      (bind-in! e [mid .-firstChild .-crossOrigin] cross-origin)
+      (bind-in! e [mid .-firstChild .-type]        type)
+      (bind-in! e [mid .-firstChild .-data]        url))))
 
-(defn playable [ctor]
-  (fn [{:keys [controls url] :as attrs} elems]
-    {:pre []} ;; todo: validate
-    (with-let [e (ctor (dissoc attrs :controls :url) elems)]
-      (bind-in! e [in .-src]      url)
-      (bind-in! e [in .-controls] (when controls "controls")))))
+(defn videoable [ctor]
+  (fn [{:keys [autoplay controls loop muted poster url] :as attrs} elems]
+    {:pre []} ;; todo
+    (with-let [e (ctor (dissoc attrs :autoplay :controls :loop :muted :poster :url) elems)]
+      (bind-in! e [mid .-firstChild .-autoplay] autoplay)
+      (bind-in! e [mid .-firstChild .-controls] (cell= (when controls "controls")))
+      (bind-in! e [mid .-firstChild .-loop]     loop)
+      (bind-in! e [mid .-firstChild .-muted]    muted)
+      (bind-in! e [mid .-firstChild .-poster]   poster)
+      (bind-in! e [mid .-firstChild .-src]      url))))
 
-(defn clickable [ctor] ;; todo: remove listener
+(defn clickable [ctor]
   (fn [{:keys [click] :as attrs} elems]
     {:pre [(callbacks? click)]}
     (with-let [e (ctor (dissoc attrs :click) elems)]
@@ -548,26 +574,29 @@
 (defn interactive [ctor]
   (fn [attrs elems]
     (with-let [e (ctor attrs elems)]
-      (let [pointer *pointer*]
-        (.addEventListener (mid e) "mouseover" #(swap! pointer update :over inc))
-        (.addEventListener (mid e) "mousedown" #(swap! pointer update :down inc))
-        (.addEventListener (mid e) "mouseup"   #(swap! pointer update :up   inc))
-        (.addEventListener (mid e) "mouseout"  #(swap! pointer assoc  :out (inc (:out @pointer)) :up (:down @pointer)))))))
+      (.addEventListener (mid e) "mouseover" (bound-fn [] (swap! *pointer* update :over inc)))
+      (.addEventListener (mid e) "mousedown" (bound-fn [] (swap! *pointer* update :down inc)))
+      (.addEventListener (mid e) "mouseup"   (bound-fn [] (swap! *pointer* update :up   inc)))
+      (.addEventListener (mid e) "mouseout"  (bound-fn [] (swap! *pointer* assoc  :out (inc (:out @*pointer*)) :up (:down @*pointer*)))))))
 
-(defn stateful [ctor]
+(defn selectable [ctor]
   (fn [attrs elems]
     (with-let [e (ctor attrs elems)]
-      (let [pointer *pointer*
-            state   *state*
-            switch  #(if (odd? (:down %)) "on" "off")
+      (let [switch #(if (odd? (:down %)) :on :off)]
+        (set-cell!= *state* (switch *pointer*))))))
+
+(defn toggleable [ctor]
+  (fn [attrs elems]
+    (with-let [e (ctor attrs elems)]
+      (let [switch  #(if (odd? (:down %)) "on" "off")
             mouse   #(cond (not= (:over %) (:out %)) "over"
                            (not= (:down %) (:up  %)) "down"
                            :else                     "out")]
-        (set-cell!= state (keyword (str (mouse pointer) "-" (switch pointer))))))))
+        (set-cell!= *state* (keyword (str (mouse *pointer*) "-" (switch *pointer*))))))))
 
 (defn windowable [ctor]
   ;; todo: finish mousechanged
-  (fn [{:keys [icon language metadata route position fonts scripts styles initiated mousechanged positionchanged statuschanged routechanged scroll] :as attrs} elems]
+  (fn [{:keys [fonts icon language metadata route position scripts styles title initiated mousechanged positionchanged statuschanged routechanged scroll] :as attrs} elems]
     (let [get-hash   #(if (= (get js/location.hash 0) "#") (subs js/location.hash 1) js/location.hash)
           set-hash!  #(if (blank? %) (.replaceState js/history #js{} js/document.title ".") (set! js/location.hash %))
           get-route  (comp hash->route get-hash)
@@ -575,7 +604,7 @@
           get-agent  #(-> js/window .-navigator)
           get-refer  #(-> js/window .-document .-referrer)
           get-status #(-> js/window .-document .-visibilityState visibility->status)]
-        (with-let [e (ctor (dissoc attrs :icon :language :metadata :position :title :route :lang :fonts :styles :scripts :initiated :mousechanged :positionchanged :statuschanged :routechanged :scroll) elems)]
+        (with-let [e (ctor (dissoc attrs :fonts :icon :language :metadata :position :route :scripts :styles :title :initiated :mousechanged :positionchanged :statuschanged :routechanged :scroll) elems)]
           (bind-in! e [out .-lang] (or language "en"))
           (bind-in! e [out .-style .-width]     "100%")
           (bind-in! e [out .-style .-height]    "100%")
@@ -592,11 +621,11 @@
             (.addEventListener js/window "visibilitychange"
               #(statuschanged (get-status))))
           (.addEventListener js/window "scroll"
-            (let [position* *position*]
-              #(let [[x y :as new-position] (vector (.-scrollX js/window) (.-scrollY js/window))]
-                (reset! position* new-position)
+            (bound-fn []
+              (let [[x y :as new-position] (vector (.-scrollX js/window) (.-scrollY js/window))]
+                (reset! *position* new-position)
                 (when positionchanged
-                  (when-not (= new-position position)
+                  (when-not (= new-position *position*)
                     (positionchanged x y))))))
           (cell= (set-route! route))
           (.addEventListener js/document "DOMContentLoaded"
@@ -607,69 +636,118 @@
             (h/html-meta :name "viewport"    :content "width=device-width, initial-scale=1")
             (for [m (if (map? metadata) (mapv (fn [[k v]] {:name k :content v}) metadata) metadata)]
               (h/html-meta (into {} (for [[k v] m] [k (name v)]))))
-            (h/title (:title attrs))
+            (when title
+              (h/title title))
             (h/link :rel "icon" :href (or icon empty-icon-url))
             (h/for-tpl [f fonts]   (h/style f))
             (h/for-tpl [s styles]  (h/link :rel "stylesheet" :href s))
             (h/for-tpl [s scripts] (h/script :src s)))))))
 
-;;; markdown ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(declare elem)
+(def leaf (comp exceptional shadow round border nudge size dock fontable color transform clickable))
+(def node (comp align pad gutter leaf))
 
-(def f
- {1 32
-  2 24
-  3 20
-  4 16
-  5 14
-  6 13})
+;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmulti  md (fn [tag ats elems] tag))
-(defmethod md :default    [tag ats elems] (elem elems))
-(defmethod md :markdown   [_ ats elems] elems)
-(defmethod md :header     [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :bulletlist [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :numberlist [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :listitem   [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :para       [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :code_block [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :inlinecode [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :img        [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :linebreak  [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :link       [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :link_ref   [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
-(defmethod md :em         [_ {:keys [level]} elems] (elem :fi :italic                 elems))
-(defmethod md :strong     [_ {:keys [level]} elems] (elem :ft :bold                   elems))
+(def elem    (-> h/div      box                                     node            parse-args))
+(def cmpt*   (-> h/div      box interactive              toggleable node            parse-args))
+(def canvas  (-> h/div      box (underlay h/canvas)                 node            parse-args))
+(def frame   (-> h/div      box (underlay h/iframe)      frameable  node            parse-args))
+(def image   (-> h/div      box (underlay h/img)         imageable  node            parse-args))
+(def object  (-> h/div      box (underlay h/html-object) objectable node            parse-args))
+(def video   (-> h/div      box (underlay h/video)       videoable  node            parse-args))
+(def window* (->            doc                                     node windowable parse-args))
 
-(defn markdownable [ctor]
-  (fn [{:keys [mdfn] :as attrs} elems]
+(def form*   (-> h/form     box         formable                    node            parse-args))
+(def line    (-> h/input    box destyle fieldable   line-field      node            parse-args))
+(def lines   (-> h/textarea box destyle fieldable   lines-field     node            parse-args))
+(def pick    (-> h/div      box destyle fieldable   pick-field      node            parse-args))
+(def picks   (-> h/div      box destyle fieldable   picks-field     node            parse-args))
+(def item*   (-> h/option   box destyle interactive selectable  item-field node     parse-args))
+(def file    (-> h/div      box         fieldable   file-field      node            parse-args))
+(def files   (-> h/div      box         fieldable   file-field      node            parse-args))
+(def write   (-> h/input    box destyle             send-field      node            parse-args))
+
+(def html    (-> h/div      box                                     node            parse-args))
+
+; FIXME Revise add+ components
+
+(defn add+toggleable [ctor]
+  (fn [{:keys [key val req] :as attrs} elems]
+    ;{:pre []} todo: validate
+    (let [data *data*
+          key-vec (if (vector? key) key [key])]
+      (swap! *data* assoc-in key-vec (or val false))
+      (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
+        (.addEventListener
+          (in e) "change"
+          #(when data (swap! data assoc-in key-vec
+                             (.-checked (in e)))))
+        (bind-in! e [in .-type] "checkbox")
+        (bind-in! e [in .-name] (cell= (pr-str key)))
+        (bind-in! e [in .-required] req)
+        (bind-in! e [in .-checked] val)))))
+
+(defn add+radioable [ctor]
+  (fn [{:keys [key val req] :as attrs} elems]
+    ;{:pre []} todo: validate
+    (let [data *data*
+          key-vec (if (vector? key) key [key])]
+      (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
+        (.addEventListener
+          (in e) "change"
+          #(when data (swap! data assoc-in key-vec
+                             (read-string (.-value (in e))))))
+        (set! (.-checked (in e)) (= (get-in @data key-vec) val))
+        (bind-in! e [in .-type] "radio")
+        (bind-in! e [in .-name] (cell= (pr-str key)))
+        (bind-in! e [in .-required] req)
+        (bind-in! e [in .-value] (cell= (pr-str val)))))))
+
+; FIXME sync with `selectable`
+(defn add+selectable [ctor]
+    (fn [{:keys [key req] :as attrs} kids]
+      (let [data *data*
+            key-vec (if (vector? key) key [key])]
+        (with-let [e (ctor (dissoc attrs :key :req))]
+          ((in e) kids)
+          (.addEventListener
+            (in e) "change"
+            #(when data (swap! data assoc-in key-vec
+                               (read-string (.-value (in e))))))
+          (bind-in! e [in .-name] (cell= (pr-str key)))
+          (bind-in! e [in .-required] req)))))
+
+; FIXME sync with line-field
+(defn add+text-field [ctor]
+  (fn [{:keys [autocomplete autocapitalize content prompt charsize charmin charmax] :as attrs} elems]
+    {:pre [(autocompletes? autocomplete) (autocapitalizes? autocapitalize) (contents? content) (integers? charsize charmin charmax)]}
+    (with-let [e (ctor (dissoc attrs :autocomplete :autocapitalize :content :prompt :charsize :charmin :charmax) elems)]
+      (bind-in! e [in .-type]           content)
+      (bind-in! e [in .-placeholder]    prompt)
+      (bind-in! e [in .-autocomplete]   autocomplete)
+      (bind-in! e [in .-autocapitalize] autocapitalize)
+      ;(bind-in! e [in .-size]           charsize)
+      (bind-in! e [in .-minlength]      charmin)
+      (bind-in! e [in .-maxlength]      charmax))))
+
+; FIXME sync with send-field
+(defn add+submittable [ctor]
+  (fn [{label :label submit' :submit :as attrs} elems]
     {:pre []} ;; todo: validate
-    (binding [hoplon.ui.elems/*mdfn* (or mdfn md)]
-      (ctor (dissoc attrs :mdfn) elems))))
+    (let [data   *data*
+          submit *submit*]
+      (with-let [e (ctor (dissoc attrs :label :submit) elems)]
+        (.addEventListener (mid e) "click" #((or submit' @submit) @data))
+        (bind-in! e [in .-type]  "button")
+        (bind-in! e [in .-value] label)))))
 
-;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def node (comp exceptional markdownable align shadow round border pad space nudge size dock fontable color transform clickable))
-
-;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def elem    (-> h/div         box assert-noattrs                                node            parse-args))
-(def comp*   (-> h/div         box assert-noattrs         interactive stateful   node            parse-args))
-(def image   (-> h/div         box assert-noattrs         imageable              node            parse-args))
-(def window* (->               doc assert-noattrs                                node windowable parse-args))
-
-(def form*   (-> h/form        box assert-noattrs         formidable             node            parse-args))
-(def toggle  (-> h/input       box assert-noattrs destyle                        node toggleable parse-args))
-(def radio   (-> h/input       box assert-noattrs destyle                        node radioable  parse-args))
-(def select  (-> h/select      box assert-noattrs destyle                        node selectable parse-args))
-(def file    (-> h/input       box assert-noattrs destyle fieldable   file-field node            parse-args))
-(def text    (-> h/input       box assert-noattrs destyle fieldable   text-field node            parse-args))
-(def submit  (-> h/input       box assert-noattrs destyle submittable            node            parse-args))
-
-(def object  (-> h/html-object box assert-noattrs         objectable             node            parse-args))
-(def video   (-> h/video       box assert-noattrs         playable               node            parse-args))
-(def frame   (-> h/iframe      box assert-noattrs         frameable              node            parse-args))
+(def toggle  (-> h/input       box assert-noattrs destyle                        node add+toggleable parse-args))
+(def radio   (-> h/input       box assert-noattrs destyle                        node add+radioable  parse-args))
+(def select  (-> h/select      box assert-noattrs destyle                        node add+selectable parse-args))
+(def text    (-> h/input       box assert-noattrs destyle fieldable   add+text-field node            parse-args))
+(def submit  (-> h/input       box assert-noattrs destyle add+submittable            node            parse-args))
 
 ;;; utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -704,6 +782,44 @@
                "src"           src
                "unicode-range" range}]
     (str "@font-face{" (apply str (mapcat (fn [[k v]] (str k ":" v ";")) (clean props))) "}")))
+
+;;; markdown ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(def f
+ {1 32
+  2 24
+  3 20
+  4 16
+  5 14
+  6 13})
+
+(defmulti  md (fn [tag ats elems] tag))
+(defmethod md :default    [tag ats elems] (elem elems))
+(defmethod md :markdown   [_ ats elems] elems)
+(defmethod md :header     [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :bulletlist [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :numberlist [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :listitem   [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :para       [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :code_block [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :inlinecode [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :img        [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :linebreak  [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :link       [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :link_ref   [_ {:keys [level]} elems] (elem :sh (r 1 1) :f (f level 16) elems))
+(defmethod md :em         [_ {:keys [level]} elems] (elem :fi :italic                 elems))
+(defmethod md :strong     [_ {:keys [level]} elems] (elem :ft :bold                   elems))
+
+(defn parse [mdstr]
+  (js->clj (.parse js/markdown mdstr) :keywordize-keys true))
+
+(defn emit [[tag atr & nodes]]
+  (let [[atr nodes] (if (map? atr) [atr nodes] [nil (cons atr nodes)])]
+    #_(prn :mdtag tag :mdats atr :nodes nodes)
+    (md (keyword tag) atr (mapv #(if (vector? %) (emit %) %) nodes))))
+
+(defn markdown [mdstr]
+  (emit (parse mdstr)))
 
 ;;; todos ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

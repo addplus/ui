@@ -1,34 +1,9 @@
 (ns hoplon.ui.elems
   (:require
     [clojure.string :refer [split-lines]]
-    [hoplon.core    :refer [html body br]]
-    [cljsjs.markdown])
+    [hoplon.core    :refer [->node html body br div]])
   (:require-macros
     [javelin.core   :refer [cell= with-let]]))
-
-;;; constants ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def ^:dynamic *mdfn* nil)
-
-;;; utils ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn split-nodes [text]
-  (let [br  #(.createElement  js/document "br")
-        txt #(.createTextNode js/document %)]
-    (->> (split-lines text)
-         (interpose br)
-         (mapv #(if (fn? %) (%) (txt %))))))
-
-(defn parse [mdstr]
-  (js->clj (.parse js/markdown mdstr) :keywordize-keys true))
-
-(defn emit [[tag atr & nodes]]
-  (let [[atr nodes] (if (map? atr) [atr nodes] [nil (cons atr nodes)])]
-    #_(prn :mdtag tag :mdats atr :nodes nodes)
-    (*mdfn* (keyword tag) atr (mapv #(if (vector? %) (emit %) %) nodes))))
-
-(defn md->elems [mdstr]
-  (emit (parse mdstr)))
 
 ;;; protocols ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -37,47 +12,7 @@
   (-mid [e])
   (-in  [e]))
 
-(defprotocol IElem
-  (-dom-element [e]))
-
 ;;; types ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(extend-type nil
-  IElem
-  (-dom-element [this]
-    this))
-
-(extend-type number
-  IElem
-  (-dom-element [this]
-    this))
-
-(extend-type string
-  IElem
-  (-dom-element [this]
-    (split-nodes this)))
-
-(extend-type PersistentVector
-  IElem
-  (-dom-element [this]
-    (with-let [frag (.createDocumentFragment js/document)]
-      (doseq [elem this]
-        (.appendChild frag (-dom-element elem))))))
-
-(extend-type javelin.core/Cell
-  IElem
-  (-dom-element [this]
-    (cell= (-dom-element this))))
-
-(deftype Markdown [mdstr]
-  IPrintWithWriter
-  (-pr-writer [_ w _]
-    (write-all w "#<Markdown: " mdstr ">"))
-  IElem
-  (-dom-element [_]
-    (-dom-element (md->elems mdstr))))
-
-(defn markdown [str] (Markdown. str))
 
 (deftype Elem [o m i]
   IPrintWithWriter
@@ -87,8 +22,8 @@
   (-out [_] o)
   (-mid [_] m)
   (-in  [_] i)
-  IElem
-  (-dom-element [e] o)
+  hoplon.core/INode
+  (node [e] o)
   hoplon.core/ICustomElement
   (-append-child! [_ new-elem]
     (hoplon.core/append-child! i new-elem))
@@ -99,7 +34,7 @@
 
 (defn- box-tree [tags]
   "construct a linked list of dom elements from a vector of tags and ctors"
-  (with-let [e (let [t (nth tags 0)] (if (fn? t) (t) (.createElement js/document t)))]
+  (with-let [e (let [t (nth tags 0)] (t))]
     (when-let [tags (not-empty (subvec tags 1))]
       (.appendChild e (box-tree tags)))))
 
@@ -131,19 +66,16 @@
     (set! (.. i -style -cursor)        "inherit")))    ;; apply the mouse cursor set on the middle div to the inner div as well
 
 (defn elem?     [v] (instance? Elem     v))
-(defn markdown? [v] (instance? Markdown v))
-
-(defn ->element [v] (-dom-element v))
 
 (defn box-with [path-fn & tags]
   "create an Elem by wrapping the model outside of the element constructor"
   (fn [_ elems]
     (let [[o m i] (-> tags box-tree path-fn box-model)]
       (with-let [e (Elem. o m i)]
-        (hoplon.core/add-children! e (mapv -dom-element elems))))))
+        (hoplon.core/add-children! e elems)))))
 
-(def  doc        (box-with doc-path html body "div"))
-(defn box [ctor] (box-with box-path "div" "div" ctor))
+(def  doc        (box-with doc-path html body div))
+(defn box [ctor] (box-with box-path div  div  ctor))
 
 (defn out [e] (-out e))
 (defn mid [e] (-mid e))

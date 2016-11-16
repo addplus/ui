@@ -3,12 +3,12 @@ a *cohesive* layer of *composable* abstractions over the dom.
 
 [](dependency)
 ```clojure
-[hoplon/ui "0.0.1-SNAPSHOT"] ;; latest release
+[hoplon/ui "0.1.0-SNAPSHOT"] ;; latest release
 ```
 [](/dependency)
 
 ## overview
-ui provides an api for user interface development based on functions instead of css and html. these functions return naked components intended for stylization within an application or thematic ui toolkit.  it encourages the use of composition and abstraction over cut-and-paste, and favors the use or variable bindings to string-based selector queries.
+ui provides an api for user interface development based on functions instead of css and html. these functions return naked components intended for stylization within an application or thematic ui toolkit.  it encourages the use of composition and abstraction over cut-and-paste, and favors the use of variable bindings to string-based selector queries.
 
 ## disclaimer
 THIS IS AN EXPERIMENTAL WORK IN PROGRESS. the api is evolving constantly as use cases accrue and the search for better abstractions to support them continues.  while the overall approach has proven effective and durable enough for some limited production use, it is not advisable to employ this library for anything other than experimentation until the interface is formally defined and the api hardened to support it.  no systematic cross-browser testing has been performed.
@@ -45,7 +45,24 @@ THIS API IS UNDER DEVELOPMENT AND SUBJECT TO ROUTINE BREAKING CHANGES.
 
 ### elems
 
-* **elem**: `elem`.  the primary function somewhat analagous to a div in html.
+* **elem**: `elem`.  the primary function somewhat analogous to a div in html.
+
+#### media elems
+these constructors return the elements necessary to render various kinds of visual media. unlike their html conterparts, they all accept children (which overlay the media content), but unlike other elems, their implicit sizes are derived from the media itself.  conversely, when the elems are explicitly passed a size argument and this size differs from the size of the underlying media, the `:fit` attribute may be passed the keyword `:fill`, `:cover`, or `:contain` to indicate whether the media content should be stretched, cropped, or reduced in size to fit within the elem's area. the media content always remains horizontally and vertically centered behind any children.
+
+* **canvas**: `canvas`. renders a canvas element for drawing.
+* **frame**: `frame`. loads html content specified by the `:url` attribute. also accepts the attributes `:allow-fullscreen`, `:sandbox` and `:type`.
+* **image**: `image`. loads an image from the location specified by the `:url` attribute.
+* **object**: `object`. loads an embeddable object via a browser plugin from the locaton specified by the `:url` attribute. also accepts the `:type` and `:cross-origin` attributes.
+* **video**: `video`. loads a video from the location specified by the `:url` attribute. also accepts the attributes `:autoplay` and `:controls`.
+
+#### form elems
+the `form` function is used to set up a context when an atomic transaction must be associated from multiple fields.  these elements are constructed by functions corresponding to the format of the value(s) they collect.  they may be used either inside of or independently from a form context.
+
+* **forms**: `form`.  creates a form context to submit the values corresponding the enclosed field elems as a single transaction.
+* **lines**: `line lines`. accepts single and multiple lines of text (via text typed input and textarea elements), respectively.  pressing the enter key while the latter has focus will insert an newline instead of submitting the form.
+* **files**: `file files`. accepts single and multiple files uploaded from the filesystem (via a file typed element), respectively.
+* **picks**: `pick picks`. accepts single and multiple picks from a set of items, respectively.
 
 ### attributes
 the attributes on an `elem` may be set by passing its constructor the following keyword arguments.  it's good practice, as a matter of convention, to pass them in the same order they appear below. any attribute may accept the global values `:initial` and `:inherit`.  these attributes may be passed to any elem.
@@ -68,6 +85,25 @@ the layout attributes specify how an `elem` should align and space its children 
   * `:mid`. align children to the center and/or middle.
   * `:end`. align children to the right and/or bottom.
   * `:jst`. evenly space children to fill all but last line (currently only implemented in the horizontal).
+
+
+## examples
+masonry layout used on sites like pinterest:
+```
+(defc widgets [{:name "widget one" :desc "widget desc" :image "http://example.com/image"} ...])
+
+(def sm 760)
+(def md 1240)
+(def lg 1480)
+
+(let [n (b 1 sm 2 md 3 lg 4)]
+  (for-tpl [col (cell= (apply map vector (partition n models)))]
+    (elem :sh (cell= (r 1 n)) :gv 8
+      (for-tpl [{:keys [image name desc]} col]
+        (image :sh (r 1 1) :av :end :b 1 :bc :grey :url image
+          (elem :sh (r 1 1) :f 21 name)
+          (elem :sh (r 1 1) :f 18 desc))))))
+```
 
 ## hacking
 
