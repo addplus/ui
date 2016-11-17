@@ -53,7 +53,10 @@
   serve {:port 5000}
   cljs {:optimizations    :none
         :compiler-options {:parallel-build  true
-                           :external-config {:devtools/config devtools-config}}})
+                           :external-config {:devtools/config      devtools-config}}}
+  cljs-devtools {:dirac-opts {:nrepl-server {:port 5001}
+                              :nrepl-tunnel {:port 5002}}})
+
 (deftask develop []
   (comp (watch) (speak) (build-jar)))
 
@@ -64,4 +67,4 @@
   (as-> (get-env) $
         (clojure.set/union (:source-paths $) (:test-paths $))
         (set-env! :source-paths $))
-  (comp (watch) (speak) (hoplon) (reload) (cljs-devtools) (cljs :optimizations :none) (serve)))
+  (comp (watch) (speak) (hoplon) (reload) (cljs-devtools) (cljs) (serve)))
