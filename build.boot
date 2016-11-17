@@ -51,11 +51,12 @@
 
 (task-options!
   serve {:port 5000}
+  reload {:on-jsload 'hoplon.index/page}
+  cljs-devtools {:dirac-opts {:nrepl-server {:port 5001}
+                              :nrepl-tunnel {:port 5002}}}
   cljs {:optimizations    :none
         :compiler-options {:parallel-build  true
-                           :external-config {:devtools/config      devtools-config}}}
-  cljs-devtools {:dirac-opts {:nrepl-server {:port 5001}
-                              :nrepl-tunnel {:port 5002}}})
+                           :external-config {:devtools/config      devtools-config}}})
 
 (deftask develop []
   (comp (watch) (speak) (build-jar)))
