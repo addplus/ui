@@ -56,7 +56,8 @@
                               :nrepl-tunnel {:port 5002}}}
   cljs {:optimizations    :none
         :compiler-options {:parallel-build  true
-                           :external-config {:devtools/config      devtools-config}}})
+                           :external-config {:devtools/config      devtools-config
+                                             :dirac.runtime/config {:agent-port 5002}}}})
 
 (deftask develop []
   (comp (watch) (speak) (build-jar)))
