@@ -469,7 +469,7 @@
   (fn [{label :label submit' :submit :as attrs} elems]
     {:pre []} ;; todo: validate
     (with-let [e (ctor (dissoc attrs :label :submit) elems)]
-      (.addEventListener (mid e) "click" (bound-fn [_] ((or submit' *submit*) *data*)))
+      (.addEventListener (mid e) "click" (bound-fn [_] (or submit' *submit*) *data*))
       (bind-in! e [in .-type]  "button")
       (bind-in! e [in .-value] label))))
 
@@ -659,42 +659,62 @@
 ; FIXME Revise add+ components
 
 (defn formable+ [ctor]
-  "set up a form context"
+  "Set up a form context."
   (fn [{:keys [change submit default] :as attrs} elems]
-    (when default (reset! *data* default))
-    (when change (cell= (do
-                          (js/console.info "form change" *data*)
-                          (change (clean *data*)))))
-    (with-let [e (ctor (dissoc attrs :change :submit :default) elems)]
-      (->> (bound-fn [e]
-             (when (= (.-which e) 13)
-               (js/console.debug "enter was pressed. data is: " *data*)
-               (.preventDefault e)                        ; FIXME Why is it needed?
-               (reset! *data* (or (submit (clean @*data*))
-                                  default
-                                  {}))))
-           (.addEventListener (in e) "keypress")))))
+    (let [default-cell (cell= (clean default))
+          reset-data! (partial reset! *data*)]
+      ; Changes in default values resets all form *data*
+      (cell= (reset-data! default-cell))
+
+      ; Monitor form *data* changes real-time
+      (when change
+        (cell= (change (clean *data*))))
+
+      (with-let [e (ctor (dissoc attrs :change :submit :default) elems)]
+        ; Pressing Enter submits the form
+        (->> (bound-fn [e]
+               (when (= (.-which e) 13)
+                 (js/console.debug "Submitted by pressing Enter" *data*)
+                 (.preventDefault e)                        ; FIXME Why was this needed?
+                 (reset! *data* (or (submit (clean @*data*))
+                                    @default))))
+             (.addEventListener (in e) "keypress"))))))
 
 (defn fieldable+ [ctor]
-  "set the values common to all form fields."
+  "Set the properties common to all form inputs."
   (fn [{:keys [key val req autofocus] :as attrs} elems]
+    (when val (throw-ui-exception "The :val attribute is NOT IMPLEMENTED YET"))
     (let [key-path (cell= (if (vector? key) key [key]))]
       (with-let [e (ctor (dissoc attrs :key :val :req :autofocus :debounce) elems)]
         (let [field (in e)
+              field-val #(.-value field)
               save (bound-fn [_]
                      (when *data*
                        (swap! *data* assoc-in
                               (read-string (.-name field))
-                              (not-empty (.-value field)))))]
+                              (not-empty (field-val)))))
+              debounced-save (if-let [deb (:debounce attrs)]
+                               (debounce deb save)
+                               save)]
           (.addEventListener field "change" save)
-          (.addEventListener field "keyup" (if-let [deb (:debounce attrs)] (debounce deb save) save))
+          (.addEventListener field "keyup" debounced-save)
+
+          ; When an input field is part of a form...
           (when key
-            (cell= (let [new-field-val (get-in *data* key-path)]
-                     (when (not= (.-value field) new-field-val)
-                       (set! (.-value field) new-field-val))))
-            (swap! *data* assoc-in @key-path (or val (.-value field))))
+            ; ...and form *data* changes for this input field
+            (cell=
+              (let [new-field-val (get-in *data* key-path)]
+                ; ...and it's different from what the field.value is
+                ; because of previous user input...
+                (when (not= (field-val) new-field-val)
+                  ; ...then reset the field.value
+                  ; otherwise the cursor would jump to the end of text input fields.
+                  (set! (.-value field) new-field-val))))
+
+            ; TODO Per-field default value...
+            #_(swap! *data* assoc-in @key-path (or val (field-val))))
+
           (bind-in! e [in .-name] (cell= (pr-str key-path)))
-          ;(bind-in! e [in .-value] val)
           (bind-in! e [in .-required] (cell= (when req :required)))
           (bind-in! e [in .-autofocus] autofocus))))))
 
@@ -744,35 +764,23 @@
           (bind-in! e [in .-name] (cell= (pr-str key)))
           (bind-in! e [in .-required] req)))))
 
-; FIXME sync with line-field
-(defn text-field+ [ctor]
-  (fn [{:keys [autocomplete autocapitalize content prompt charsize charmin charmax] :as attrs} elems]
-    {:pre [(autocompletes? autocomplete) (autocapitalizes? autocapitalize) (contents? content) (integers? charsize charmin charmax)]}
-    (with-let [e (ctor (dissoc attrs :autocomplete :autocapitalize :content :prompt :charsize :charmin :charmax) elems)]
-      (bind-in! e [in .-type]           content)
-      (bind-in! e [in .-placeholder]    prompt)
-      (bind-in! e [in .-autocomplete]   autocomplete)
-      (bind-in! e [in .-autocapitalize] autocapitalize)
-      ;(bind-in! e [in .-size]           charsize)
-      (bind-in! e [in .-minlength]      charmin)
-      (bind-in! e [in .-maxlength]      charmax))))
-
-; FIXME sync with send-field
-(defn submittable+ [ctor]
+(defn send-field+ [ctor]
   (fn [{label :label submit' :submit :as attrs} elems]
     {:pre []} ;; todo: validate
-    (let [data   *data*
-          submit *submit*]
-      (with-let [e (ctor (dissoc attrs :label :submit) elems)]
-        (.addEventListener (mid e) "click" #((or submit' @submit) @data))
-        (bind-in! e [in .-type]  "button")
-        (bind-in! e [in .-value] label)))))
+    (with-let [e (ctor (dissoc attrs :label :submit) elems)]
+      (.addEventListener (mid e) "click" (bound-fn [_] ((or submit' *submit*) *data*)))
+      (bind-in! e [in .-type]  "button")
+      (bind-in! e [in .-value] label))))
 
-(def toggle  (-> h/input box assert-noattrs destyle node toggleable+ parse-args))
-(def radio   (-> h/input box assert-noattrs destyle node radioable+ parse-args))
-(def select  (-> h/select box assert-noattrs destyle node selectable+ parse-args))
-(def text    (-> h/input box assert-noattrs destyle fieldable+ text-field+ node parse-args))
-(def submit  (-> h/input box assert-noattrs destyle submittable+ node parse-args))
+(def form*+   (-> h/form     box         formable+                    node            parse-args))
+(def line+    (-> h/input    box destyle fieldable+   line-field      node            parse-args))
+(def write+   (-> h/input    box destyle send-field+                  node            parse-args))
+
+(def toggle   (-> h/input    box destyle toggleable+                  node            parse-args))
+(def radio    (-> h/input    box destyle radioable+                   node            parse-args))
+(def select   (-> h/select   box destyle selectable+                  node            parse-args))
+(def text     line+)
+(def submit   write+)
 
 ;;; utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

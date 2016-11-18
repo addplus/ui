@@ -29,6 +29,12 @@
                             *submit* (atom nil)]
     (form* ~@args)))
 
+(defmacro form+ [& args]
+  `(hoplon.binding/binding [*data*   (javelin.core/cell {})
+                            *error*  (atom nil)
+                            *submit* (atom nil)]
+    (form*+ ~@args)))
+
 (defmacro window [& args]
   `(hoplon.binding/binding [*position* (javelin.core/cell nil)]
      (window* ~@args)))
