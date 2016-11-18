@@ -656,10 +656,12 @@
 
 (def html    (-> h/div      box                                     node            parse-args))
 
-; FIXME Revise add+ components
 
-(defn formable+ [ctor]
+; =========== add+ components ============
+
+(defn formable+
   "Set up a form context."
+  [ctor]
   (fn [{:keys [change submit default] :as attrs} elems]
     (reset! *submit* submit)
     (let [default-cell (cell= (clean default))
@@ -680,8 +682,9 @@
                                     @default-cell))))
              (.addEventListener (in e) "keypress"))))))
 
-(defn fieldable+ [ctor]
+(defn fieldable+
   "Set the properties common to all form inputs."
+  [ctor]
   (fn [{:keys [key val req autofocus] :as attrs} elems]
     (when val (throw-ui-exception "The :val attribute is NOT IMPLEMENTED YET"))
     (let [key-path (cell= (if (vector? key) key [key]))]
@@ -695,21 +698,24 @@
                               (not-empty (field-val)))))
               debounced-save (if-let [deb (:debounce attrs)]
                                (debounce deb save)
-                               save)]
+                               save)
+              sync-field-val (fn [new-data]
+                               "Set field value from form data, but only if it's different.
+
+                                The cursor jumps to the end of text input fields when setting their value,
+                                even if setting it to the same value as its current value."
+                               (js/console.debug (str "sync " @key-path "?") new-data)
+                               (let [new-field-val (get-in new-data @key-path)]
+                                 (when (not= (.-value field) new-field-val)
+                                   (set! (.-value field) new-field-val))))]
           (.addEventListener field "change" save)
           (.addEventListener field "keyup" debounced-save)
 
-          ; When an input field is part of a form...
           (when key
-            ; ...and form *data* changes for this input field
-            (cell=
-              (let [new-field-val (get-in *data* key-path)]
-                ; ...and it's different from what the field.value is
-                ; because of previous user input...
-                (when (not= (field-val) new-field-val)
-                  ; ...then reset the field.value
-                  ; otherwise the cursor would jump to the end of text input fields.
-                  (set! (.-value field) new-field-val))))
+            ; When an input field is part of a form
+            ; and form *data* changes for this input field
+            ; then update the field value if necessary
+            (cell= (sync-field-val *data*))
 
             ; TODO Per-field default value...
             #_(swap! *data* assoc-in @key-path (or val (field-val))))
@@ -718,9 +724,59 @@
           (bind-in! e [in .-required] (cell= (when req :required)))
           (bind-in! e [in .-autofocus] autofocus))))))
 
+(defn selected-values
+  "Returns the set of selected OPTION values of a SELECT js/Element."
+  [select-field]
+  (let [multi? (.-multiple select-field)
+        maybe-set #(if multi? (into #{} %) (first %))
+        sel-opts (.-selectedOptions select-field)]
+    (-> (for [i (range (.-length sel-opts))]
+          (-> sel-opts (.item i) .-value read-string))
+        (maybe-set)
+        (#(do (pr %) %)))))
+
+(defn sync-changed-options! [option-kids new-selection]
+  ; TODO option-kids might be mixed with h/optgroup
+  ; so a smarter traversal is needed
+  (doseq [opt option-kids]
+    (let [opt-val (read-string (.-value opt))
+          selected-now? (.-selected opt)
+          should-select? (contains? new-selection opt-val)]
+      (when (not= should-select? selected-now?)
+        (set! (.-selected opt) should-select?)))))
+
+(defn select-field [ctor]
+  (fn [{:keys [key multi? req autofocus rows size] :as attrs} option-kids]
+    (when (or rows size) (throw-ui-exception "Use :sv instead"))
+    (let [ks (cell= (if (vector? key) key [key]))]
+      (with-let [e (ctor (dissoc attrs :key :multi? :req :autofocus :debounce :rows :size) option-kids)]
+        (let [field (in e)
+              save (bound-fn [_]
+                     (when *data*
+                       (swap! *data* assoc-in @ks
+                              ((if multi? not-empty identity)
+                                (selected-values field)))))
+              debounced-save (if-let [deb (:debounce attrs)]
+                               (debounce deb save)
+                               save)]
+          (.addEventListener field "change" save)
+          (.addEventListener field "keyup" debounced-save)
+
+          (when key
+            ; When a SELECT field is a child of a form
+            ; and form *data* changes for its key-sequence
+            ; then sync the selected property of its OPTION elements
+            (cell= (->> (get-in *data* ks)
+                        ((if multi? identity hash-set))
+                        (sync-changed-options! option-kids))))
+
+          (bind-in! e [in .-name] (cell= (pr-str ks)))
+          (bind-in! e [in .-multiple] (cell= (when multi? :multiple)))
+          (bind-in! e [in .-required] (cell= (when req :required)))
+          (bind-in! e [in .-autofocus] autofocus))))))
+
 (defn toggleable+ [ctor]
   (fn [{:keys [key val req] :as attrs} elems]
-    ;{:pre []} todo: validate
     (let [data *data*
           key-vec (if (vector? key) key [key])]
       (swap! *data* assoc-in key-vec (or val false))
@@ -750,28 +806,13 @@
         (bind-in! e [in .-required] req)
         (bind-in! e [in .-value] (cell= (pr-str val)))))))
 
-; FIXME sync with `selectable`
-(defn selectable+ [ctor]
-    (fn [{:keys [key req] :as attrs} kids]
-      (let [data *data*
-            key-vec (if (vector? key) key [key])]
-        (with-let [e (ctor (dissoc attrs :key :req))]
-          ((in e) kids)
-          (.addEventListener
-            (in e) "change"
-            #(when data (swap! data assoc-in key-vec
-                               (read-string (.-value (in e))))))
-          (bind-in! e [in .-name] (cell= (pr-str key)))
-          (bind-in! e [in .-required] req)))))
-
 (defn send-field+ [ctor]
   (fn [{label :label submit' :submit :as attrs} elems]
-    {:pre []} ;; todo: validate
     (with-let [e (ctor (dissoc attrs :label :submit) elems)]
       (->> (bound-fn [_]
              ((or submit' @*submit* identity) (clean @*data*)))
            (.addEventListener (mid e) "click"))
-      (bind-in! e [in .-type]  "button")
+      (bind-in! e [in .-type] "button")
       (bind-in! e [in .-value] label))))
 
 (def form*+   (-> h/form     box         formable+                    node            parse-args))
@@ -780,9 +821,8 @@
 
 (def toggle   (-> h/input    box destyle toggleable+                  node            parse-args))
 (def radio    (-> h/input    box destyle radioable+                   node            parse-args))
-(def select   (-> h/select   box destyle selectable+                  node            parse-args))
+(def select   (-> h/select   box destyle select-field                 node            parse-args))
 (def text     line+)
-(def submit   write+)
 
 ;;; utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

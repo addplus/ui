@@ -16,14 +16,17 @@
 (defelem row [a e] (elem :sh (r 1 1) :g g a e))
 (defelem label [a e] (elem :ah :end a e))
 (defelem line+ [a e] (hui/line+ :f 12 :p 4 :b 1 :bc transparent-grey a e))
+(defelem select [a e] (hui/select :p 4 :b 1 :bc transparent-grey a e))
 
 (defn path-cell [c path & [not-found]]
   (cell= (get-in c path not-found) (partial swap! c assoc-in path)))
 
-(defc form1-default nil)
+(defc form1-default {:amt "123"
+                     :lvl1 {:lvl2 :option-1}})
 
-(h/with-timeout 3000
-  (reset! form1-default {:amt "123"}))
+#_(h/with-timeout 3000
+  (reset! form1-default {:amt "999"
+                         :lvl1 {:lvl2 :option-2}}))
 
 (defn form1 []
   (hui/form+
@@ -37,11 +40,21 @@
     (line+ :sh (r 1 2)
            :key :amt
            :autofocus true)
-    (hui/write+ :label "Reset"
+    (hui/write+ :label "Submit & Reset"
                 :sh (r 1 1)
                 :ah :mid
                 :c transparent-grey
-                :submit #(reset! hui/*data* {:amt "<reset>"}))))
+                :submit #(reset! hui/*data* {:amt  "<reset>"
+                                             :lvl1 {:lvl2 'sym-opt}}))
+    (select :sh (r 1 1)
+            :sv (em 4)
+            :key [:lvl1 :lvl2]
+            :multi? true
+            (h/option :value "" "--- Select something ---")
+            (h/option :value :kw-opt "Keyword Option")
+            (h/option :value 'sym-opt "Symbol Option")
+            (h/option :value (pr-str "str-opt") "String Option")
+            (h/option :value "\"str-opt-2\"" "Other String Option"))))
 
 (defn page []
   (window
