@@ -75,3 +75,5 @@ pom.xml
 
 /log/
 /tgt/
+/.vertx/
+/project.clj
