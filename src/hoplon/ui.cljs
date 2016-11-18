@@ -687,7 +687,7 @@
   [ctor]
   (fn [{:keys [key val req autofocus] :as attrs} elems]
     (when val (throw-ui-exception "The :val attribute is NOT IMPLEMENTED YET"))
-    (let [key-path (cell= (if (vector? key) key [key]))]
+    (let [ks (cell= (if (vector? key) key [key]))]
       (with-let [e (ctor (dissoc attrs :key :val :req :autofocus :debounce) elems)]
         (let [field (in e)
               field-val #(.-value field)
@@ -704,8 +704,7 @@
 
                                 The cursor jumps to the end of text input fields when setting their value,
                                 even if setting it to the same value as its current value."
-                               (js/console.debug (str "sync " @key-path "?") new-data)
-                               (let [new-field-val (get-in new-data @key-path)]
+                               (let [new-field-val (get-in new-data @ks)]
                                  (when (not= (.-value field) new-field-val)
                                    (set! (.-value field) new-field-val))))]
           (.addEventListener field "change" save)
@@ -718,11 +717,17 @@
             (cell= (sync-field-val *data*))
 
             ; TODO Per-field default value...
-            #_(swap! *data* assoc-in @key-path (or val (field-val))))
+            #_(swap! *data* assoc-in @ks (or val (field-val))))
 
-          (bind-in! e [in .-name] (cell= (pr-str key-path)))
+          (bind-in! e [in .-name] (cell= (pr-str ks)))
           (bind-in! e [in .-required] (cell= (when req :required)))
           (bind-in! e [in .-autofocus] autofocus))))))
+
+(defn html-coll-seq
+  "Returns a js/HTMLCollection as a lazy sequence"
+  [html-coll]
+  (for [i (range (.-length html-coll))]
+    (-> html-coll (.item i))))
 
 (defn selected-values
   "Returns the set of selected OPTION values of a SELECT js/Element."
@@ -730,15 +735,13 @@
   (let [multi? (.-multiple select-field)
         maybe-set #(if multi? (into #{} %) (first %))
         sel-opts (.-selectedOptions select-field)]
-    (-> (for [i (range (.-length sel-opts))]
-          (-> sel-opts (.item i) .-value read-string))
+    (->> sel-opts html-coll-seq
+        (map #(-> % .-value read-string))
         (maybe-set)
         (#(do (pr %) %)))))
 
-(defn sync-changed-options! [option-kids new-selection]
-  ; TODO option-kids might be mixed with h/optgroup
-  ; so a smarter traversal is needed
-  (doseq [opt option-kids]
+(defn sync-changed-options! [field new-selection]
+  (doseq [opt (->> field .-options html-coll-seq)]
     (let [opt-val (read-string (.-value opt))
           selected-now? (.-selected opt)
           should-select? (contains? new-selection opt-val)]
@@ -768,7 +771,7 @@
             ; then sync the selected property of its OPTION elements
             (cell= (->> (get-in *data* ks)
                         ((if multi? identity hash-set))
-                        (sync-changed-options! option-kids))))
+                        (sync-changed-options! field))))
 
           (bind-in! e [in .-name] (cell= (pr-str ks)))
           (bind-in! e [in .-multiple] (cell= (when multi? :multiple)))
