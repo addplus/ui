@@ -373,9 +373,9 @@
 (defn formable [ctor]
   "set up a form context"
   (fn [{:keys [change submit] :as attrs} elems]
-    (when change (cell= (change (clean *data*)))) ;; init *data* to value of form fields on render
-     (with-let [e (ctor (dissoc attrs :change :submit) elems)]
-       (.addEventListener (in e) "keypress" (bound-fn [e] (when (= (.-which e) 13) (submit (clean @*data*))))))))
+    (when change (cell= (change (clean *data*))))           ;; init *data* to value of form fields on render
+    (with-let [e (ctor (dissoc attrs :change :submit) elems)]
+      (.addEventListener (in e) "keypress" (bound-fn [e] (when (= (.-which e) 13) (submit (clean @*data*))))))))
 
 (defn fieldable [ctor]
   "set the values common to all form fields."
@@ -661,6 +661,7 @@
 (defn formable+ [ctor]
   "Set up a form context."
   (fn [{:keys [change submit default] :as attrs} elems]
+    (reset! *submit* submit)
     (let [default-cell (cell= (clean default))
           reset-data! (partial reset! *data*)]
       ; Changes in default values resets all form *data*
@@ -674,10 +675,9 @@
         ; Pressing Enter submits the form
         (->> (bound-fn [e]
                (when (= (.-which e) 13)
-                 (js/console.debug "Submitted by pressing Enter" *data*)
-                 (.preventDefault e)                        ; FIXME Why was this needed?
-                 (reset! *data* (or (submit (clean @*data*))
-                                    @default))))
+                 ;(.preventDefault e)                        ; FIXME Why was this needed?
+                 (reset! *data* (or ((or @*submit* identity) (clean @*data*))
+                                    @default-cell))))
              (.addEventListener (in e) "keypress"))))))
 
 (defn fieldable+ [ctor]
@@ -740,10 +740,10 @@
     (let [data *data*
           key-vec (if (vector? key) key [key])]
       (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
-        (.addEventListener
-          (in e) "change"
-          #(when data (swap! data assoc-in key-vec
-                             (read-string (.-value (in e))))))
+        (->> #(when data
+                (swap! data assoc-in key-vec
+                       (read-string (.-value (in e)))))
+             (.addEventListener (in e) "change"))
         (set! (.-checked (in e)) (= (get-in @data key-vec) val))
         (bind-in! e [in .-type] "radio")
         (bind-in! e [in .-name] (cell= (pr-str key)))
@@ -768,7 +768,9 @@
   (fn [{label :label submit' :submit :as attrs} elems]
     {:pre []} ;; todo: validate
     (with-let [e (ctor (dissoc attrs :label :submit) elems)]
-      (.addEventListener (mid e) "click" (bound-fn [_] ((or submit' *submit*) *data*)))
+      (->> (bound-fn [_]
+             ((or submit' @*submit* identity) (clean @*data*)))
+           (.addEventListener (mid e) "click"))
       (bind-in! e [in .-type]  "button")
       (bind-in! e [in .-value] label))))
 
