@@ -10,12 +10,22 @@
 (def grey (c 0x888888))
 (def transparent-grey (c 128 128 128 0.5))
 (def black (c 0x1F1F1F))
-(def orange (c 0xE73624))
+(def red (c 0xE73624))
 (def blue (c 0x009BFF))
-(def yellow (c 0xF5841F))
+(def orange (c 0xF5841F))
 (def g 12)
 (def p 4)
-(def db {:b 1 :bc (c 255 0 0 0.1)})
+(def db "debug border" {:b 1 :bc (c 255 0 0 0.1)})
+
+(defn path-cell [c path & [not-found]]
+  (cell= (get-in c path not-found) (partial swap! c assoc-in path)))
+
+(defc route (hui/hash->route js/window.location.hash))
+(def path (path-cell route [0]))
+(def qmap (path-cell route [1]))
+(def view (path-cell route [0 0]))
+(def tab (path-cell route [0 1]))
+
 (defelem row [a e] (elem :sh (r 1 1) a e))
 (defelem pre [a e]
   (with-let [e' (elem a e)]
@@ -35,12 +45,10 @@
          (hui/html label))))
 
 (defelem radio+ [{:keys [key val] :as attrs} [label-content]]
-  (hui/label+ :sh (r 1 1) :gh g :av :mid (dissoc attrs :key :val)
+  (hui/label+ :sh (r 1 1) :p p :gh g :av :mid
+              :c (c 128 128 128 0.1) (dissoc attrs :key :val)
               (hui/radio+ :s 14 :key key :val val)
               label-content))
-
-(defn path-cell [c path & [not-found]]
-  (cell= (get-in c path not-found) (partial swap! c assoc-in path)))
 
 (defc form1-default {:amt         "123"
                      :select      {:single   nil
@@ -89,6 +97,11 @@
       ;(row "Single select")
       (select+ :sh (r 1 1)
                :key [:select :single]
+               (for [o ["" :kw-opt 'sym-opt (pr-str "str-opt") "\"str-opt-2\""]]
+                 (h/option :value o (cell= (str o)))))
+
+      (select+ :sh (r 1 1)
+               :key [:select :single]
                (h/option :value "" "--- Select something ---")
                (h/option :value :kw-opt "Keyword Option")
                (h/option :value 'sym-opt "Symbol Option")
@@ -120,5 +133,12 @@
 
 (defn page []
   (window
+    :route route
     (row :ah :mid
-         (form1))))
+         ; Debug routing
+         (pre :c blue :fc (c 255 255 255) :p p
+              "Route: " (pre :ff "monospace" (cell= (pr-str route))))
+         (case-tpl view
+                   :x (form1)
+                   :y (form1)
+                   (form1)))))
