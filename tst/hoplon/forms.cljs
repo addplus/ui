@@ -96,10 +96,17 @@
               (h/option :value (pr-str "str-opt") "String Option")
               (h/option :value "\"str-opt-2\"" "Other String Option"))
 
-      ;(row "Radio buttons")
-      (radio :key :animal/type :val :animal.type/cat "Cat")
-      (radio :key :animal/type :val :animal.type/dog "Dog")
-      (radio :key :animal/type :val :animal.type/bat "Bat"))))
+      ;(row "Radio button group 1")
+      (row :p (* 2 p) :g g :b 1 :bc transparent-grey
+           (radio :key :animal/type :val :animal.type/cat "Cat")
+           (radio :key :animal/type :val :animal.type/dog "Dog")
+           (radio :key :animal/type :val :animal.type/bat "Bat"))
+
+      ;(row "Radio button group 2")
+      (row :p (* 2 p) :g g :b 1 :bc transparent-grey
+           (radio :key :tree/type :val :tree.type/cat "Apple")
+           (radio :key :tree/type :val :tree.type/dog "Pineapple")
+           (radio :key :tree/type :val :tree.type/bat "Durian")))))
 
 (defn page []
   (window
