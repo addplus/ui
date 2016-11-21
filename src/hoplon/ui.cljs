@@ -678,8 +678,9 @@
         (->> (bound-fn [e]
                (when (= (.-which e) 13)
                  ;(.preventDefault e)                        ; FIXME Why was this needed?
-                 (reset! *data* (or ((or @*submit* identity) (clean @*data*))
-                                    @default-cell))))
+                 (->> @default-cell
+                      (or ((or @*submit* identity) (clean @*data*)))
+                      (reset! *data*))))
              (.addEventListener (in e) "keypress"))))))
 
 (defn fieldable+
@@ -813,7 +814,8 @@
   (fn [{label :label submit' :submit :as attrs} elems]
     (with-let [e (ctor (dissoc attrs :label :submit) elems)]
       (->> (bound-fn [_]
-             ((or submit' @*submit* identity) (clean @*data*)))
+             (->> ((or submit' @*submit* identity) (clean @*data*))
+                  (reset! *data*)))
            (.addEventListener (mid e) "click"))
       (bind-in! e [in .-type] "button")
       (bind-in! e [in .-value] label))))
