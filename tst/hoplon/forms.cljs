@@ -21,13 +21,17 @@
   (with-let [e' (elem a e)]
     (bind-in! e' [in .-style .-whiteSpace] "pre-wrap")))
 
-(defelem label [a e] (elem :ah :end a e))
 (defelem line+ [a e] (hui/line+ :f 12 :p p :b 1 :bc transparent-grey a e))
 (defelem select [a e] (hui/select :p p :b 1 :bc transparent-grey a e))
-(defelem radio [{:keys [key val] :as attrs} elems]
-  (row :gh g (dissoc attrs :key :val)
-       (hui/radio :s 14 :key key :val val)
-       elems))
+(defelem radio [{:keys [key val] :as attrs} [label-content]]
+  (let [radio (hui/radio :s 14 :key key :val val)
+        label (h/label label-content)
+        id# (str (gensym "radio"))]
+    (set! (.-id (in radio)) id#)
+    (set! (.-htmlFor label) id#)
+    (row :gh g :av :mid (dissoc attrs :key :val)
+         radio
+         (hui/html label))))
 
 (defn path-cell [c path & [not-found]]
   (cell= (get-in c path not-found) (partial swap! c assoc-in path)))
