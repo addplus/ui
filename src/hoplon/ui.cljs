@@ -827,7 +827,6 @@
 (def toggle   (-> h/input    box destyle toggleable+                  node            parse-args))
 (def radio    (-> h/input    box destyle radioable+                   node            parse-args))
 (def select   (-> h/select   box destyle select-field                 node            parse-args))
-(def text     line+)
 
 ;;; utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
