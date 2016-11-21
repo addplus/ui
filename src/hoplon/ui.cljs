@@ -796,19 +796,25 @@
 
 (defn radioable+ [ctor]
   (fn [{:keys [key val req] :as attrs} elems]
-    ;{:pre []} todo: validate
-    (let [data *data*
-          key-vec (if (vector? key) key [key])]
+    (let [ks (cell= (if (vector? key) key [key]))
+          val (cell= val)]
       (with-let [e (ctor (dissoc (merge {:s (em 1)} attrs) :key :val :req) elems)]
-        (->> #(when data
-                (swap! data assoc-in key-vec
-                       (read-string (.-value (in e)))))
-             (.addEventListener (in e) "change"))
-        (set! (.-checked (in e)) (= (get-in @data key-vec) val))
-        (bind-in! e [in .-type] "radio")
-        (bind-in! e [in .-name] (cell= (pr-str key)))
-        (bind-in! e [in .-required] req)
-        (bind-in! e [in .-value] (cell= (pr-str val)))))))
+        (let [field (in e)
+              save (bound-fn [_]
+                     (when (and *data* (.-checked field))
+                       (swap! *data* assoc-in @ks @val)))
+              sync-field-val (fn [new-data]
+                               (let [new-field-val (get-in new-data @ks)
+                                     new-field-checked? (= @val new-field-val)]
+                                 (when (not= new-field-checked? (.-checked field))
+                                   (set! (.-checked field) new-field-checked?))))]
+          (.addEventListener field "change" save)
+          (when key (cell= (sync-field-val *data*)))
+
+          (bind-in! e [in .-type] "radio")
+          (bind-in! e [in .-name] (cell= (pr-str key)))
+          (bind-in! e [in .-required] (cell= (when req :required)))
+          (bind-in! e [in .-value] (cell= (pr-str val))))))))
 
 (defn send-field+ [ctor]
   (fn [{label :label submit' :submit :as attrs} elems]
