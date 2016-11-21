@@ -22,9 +22,10 @@
     (bind-in! e' [in .-style .-whiteSpace] "pre-wrap")))
 
 (defelem line+ [a e] (hui/line+ :f 12 :p p :b 1 :bc transparent-grey a e))
-(defelem select [a e] (hui/select :p p :b 1 :bc transparent-grey a e))
-(defelem radio [{:keys [key val] :as attrs} [label-content]]
-  (let [radio (hui/radio :s 14 :key key :val val)
+(defelem select+ [a e] (hui/select+ :p p :b 1 :bc transparent-grey a e))
+
+(defelem radio+label [{:keys [key val] :as attrs} [label-content]]
+  (let [radio (hui/radio+ :s 14 :key key :val val)
         label (h/label label-content)
         id# (str (gensym "radio"))]
     (set! (.-id (in radio)) id#)
@@ -32,6 +33,11 @@
     (row :gh g :av :mid (dissoc attrs :key :val)
          radio
          (hui/html label))))
+
+(defelem radio+ [{:keys [key val] :as attrs} [label-content]]
+  (hui/label+ :sh (r 1 1) :gh g :av :mid (dissoc attrs :key :val)
+              (hui/radio+ :s 14 :key key :val val)
+              label-content))
 
 (defn path-cell [c path & [not-found]]
   (cell= (get-in c path not-found) (partial swap! c assoc-in path)))
@@ -81,36 +87,36 @@
                                      :animal/type :animal.type/bat))
 
       ;(row "Single select")
-      (select :sh (r 1 1)
-              :key [:select :single]
-              (h/option :value "" "--- Select something ---")
-              (h/option :value :kw-opt "Keyword Option")
-              (h/option :value 'sym-opt "Symbol Option")
-              (h/option :value (pr-str "str-opt") "String Option")
-              (h/option :value "\"str-opt-2\"" "Other String Option"))
+      (select+ :sh (r 1 1)
+               :key [:select :single]
+               (h/option :value "" "--- Select something ---")
+               (h/option :value :kw-opt "Keyword Option")
+               (h/option :value 'sym-opt "Symbol Option")
+               (h/option :value (pr-str "str-opt") "String Option")
+               (h/option :value "\"str-opt-2\"" "Other String Option"))
 
       ;(row "Multi-select")
-      (select :sh (r 1 1)
-              :sv (em 4)
-              :key [:select :multiple]
-              :multi? true
-              (h/option :value "" "--- Select something ---")
-              (h/option :value :kw-opt "Keyword Option")
-              (h/option :value 'sym-opt "Symbol Option")
-              (h/option :value (pr-str "str-opt") "String Option")
-              (h/option :value "\"str-opt-2\"" "Other String Option"))
+      (select+ :sh (r 1 1)
+               :sv (em 4)
+               :key [:select :multiple]
+               :multi? true
+               (h/option :value "" "--- Select something ---")
+               (h/option :value :kw-opt "Keyword Option")
+               (h/option :value 'sym-opt "Symbol Option")
+               (h/option :value (pr-str "str-opt") "String Option")
+               (h/option :value "\"str-opt-2\"" "Other String Option"))
 
       ;(row "Radio button group 1")
       (row :p (* 2 p) :g g :b 1 :bc transparent-grey
-           (radio :key :animal/type :val :animal.type/cat "Cat")
-           (radio :key :animal/type :val :animal.type/dog "Dog")
-           (radio :key :animal/type :val :animal.type/bat "Bat"))
+           (radio+label :key :animal/type :val :animal.type/cat "Cat")
+           (radio+label :key :animal/type :val :animal.type/dog "Dog")
+           (radio+label :key :animal/type :val :animal.type/bat "Bat"))
 
       ;(row "Radio button group 2")
       (row :p (* 2 p) :g g :b 1 :bc transparent-grey
-           (radio :key :tree/type :val :tree.type/cat "Apple")
-           (radio :key :tree/type :val :tree.type/dog "Pineapple")
-           (radio :key :tree/type :val :tree.type/bat "Durian")))))
+           (radio+ :key :tree/type :val :tree.type/cat "Apple")
+           (radio+ :key :tree/type :val :tree.type/dog "Pineapple")
+           (radio+ :key :tree/type :val :tree.type/bat "Durian")))))
 
 (defn page []
   (window

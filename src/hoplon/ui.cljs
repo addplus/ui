@@ -749,7 +749,7 @@
       (when (not= should-select? selected-now?)
         (set! (.-selected opt) should-select?)))))
 
-(defn select-field [ctor]
+(defn select-field+ [ctor]
   (fn [{:keys [key multi? req autofocus rows size] :as attrs} option-kids]
     (when (or rows size) (throw-ui-exception "Use :sv instead"))
     (let [ks (cell= (if (vector? key) key [key]))]
@@ -830,9 +830,10 @@
 (def line+    (-> h/input    box destyle fieldable+   line-field      node            parse-args))
 (def write+   (-> h/input    box destyle send-field+                  node            parse-args))
 
+(def label+   (-> h/label    box destyle                              node            parse-args))
 (def toggle   (-> h/input    box destyle toggleable+                  node            parse-args))
-(def radio    (-> h/input    box destyle radioable+                   node            parse-args))
-(def select   (-> h/select   box destyle select-field                 node            parse-args))
+(def radio+   (-> h/input    box destyle radioable+                   node            parse-args))
+(def select+  (-> h/select   box destyle select-field+                node            parse-args))
 
 ;;; utilities ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
