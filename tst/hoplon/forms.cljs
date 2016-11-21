@@ -42,7 +42,7 @@
     (set! (.-htmlFor label) id#)
     (row :gh g :av :mid (dissoc attrs :key :val)
          radio
-         (hui/html label))))
+         label)))
 
 (defelem radio+ [{:keys [key val] :as attrs} [label-content]]
   (hui/label+ :sh (r 1 1) :p p :gh g :av :mid
