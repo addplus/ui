@@ -26,12 +26,14 @@
 (defn path-cell [c path & [not-found]]
   (cell= (get-in c path not-found) (partial swap! c assoc-in path)))
 
-(defc form1-default {:amt "123"
-                     :select {:single :option-1}})
+(defc form1-default {:amt    "123"
+                     :select {:single nil
+                              :multiple nil}
+                     :animal/type nil})
 
 #_(h/with-timeout 3000
-  (reset! form1-default {:amt "999"
-                         :select {:single :option-2}}))
+    (reset! form1-default {:amt    "999"
+                           :select {:single :option-2}}))
 
 (defn form1 []
   (hui/form+
@@ -53,7 +55,8 @@
                 :ah :mid
                 :c transparent-grey
                 :submit #(hash-map :amt "<reset>"
-                                   :select {:single #{'sym-opt}}
+                                   :select {:single   'sym-opt
+                                            :multiple #{'sym-opt}}
                                    :animal/type :animal.type/bat))
 
     ;(row "Single select")
