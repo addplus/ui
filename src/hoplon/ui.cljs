@@ -94,11 +94,7 @@
 (defn swap-elems! [e f & vs] ;; todo: factor out
   (cond (cell?       e) (cell= (apply swap-elems! e f vs))
         (sequential? e) (doseq [e e] (apply swap-elems! e f vs)) ;;todo: handled with IElemValue if (hoplon.ui/elem?)
-        (elem?       e) (apply f e vs)
-        (string?     e) identity
-        (nil?        e) identity
-        (fn?       e) identity
-        :else       (throw-ui-exception "Invalid child of type " (type e) " with values " vs ".")))
+        (elem?       e) (apply f e vs)))
 
 (defn validate [validator]
   (fn [& vs]
@@ -630,7 +626,7 @@
 
 ;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def leaf (comp exceptional shadow round border nudge size dock fontable color transform clickable))
+(def leaf (comp shadow round border nudge size dock fontable color transform clickable))
 (def node (comp align pad gutter leaf))
 
 ;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -653,8 +649,6 @@
 (def file    (-> h/div      box         fieldable   file-field      node            parse-args))
 (def files   (-> h/div      box         fieldable   file-field      node            parse-args))
 (def write   (-> h/input    box destyle             send-field      node            parse-args))
-
-(def html    (-> h/div      box                                     node            parse-args))
 
 
 ; =========== add+ components ============
