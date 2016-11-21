@@ -44,8 +44,8 @@
                 :sh (r 1 1)
                 :ah :mid
                 :c transparent-grey
-                :submit #(reset! hui/*data* {:amt  "<reset>"
-                                             :lvl1 {:lvl2 #{'sym-opt}}}))
+                :submit #(hash-map :amt "<reset>"
+                                   :lvl1 {:lvl2 #{'sym-opt}}))
     (select :sh (r 1 1)
             :sv (em 4)
             :key [:lvl1 :lvl2]
