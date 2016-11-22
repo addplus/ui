@@ -653,13 +653,23 @@
 
 ; =========== add+ components ============
 
+(defn cant-submit [data]
+  (js/console.debug "No :submit action specified; can't submit:" data)
+  data)
+
 (defn formable+
   "Set up a form context."
   [ctor]
   (fn [{:keys [change submit default] :as attrs} elems]
     (reset! *submit* submit)
     (let [default-cell (cell= (clean default))
-          reset-data! (partial reset! *data*)]
+          reset-data! (partial reset! *data*)
+          submit! #(reset-data! (or (-> @*data* clean not-empty submit)
+                                      @default-cell))]
+
+      ; Form-level submit action for submit fields to use as default action
+      (reset! *submit* (if submit submit! cant-submit))
+
       ; Changes in default values resets all form *data*
       (cell= (reset-data! default-cell))
 
@@ -672,9 +682,7 @@
         (->> (bound-fn [e]
                (when (= (.-which e) 13)
                  ;(.preventDefault e)                        ; FIXME Why was this needed?
-                 (->> @default-cell
-                      (or ((or @*submit* identity) (clean @*data*)))
-                      (reset! *data*))))
+                 (@*submit*)))
              (.addEventListener (in e) "keypress"))))))
 
 (defn fieldable+
@@ -811,11 +819,12 @@
           (bind-in! e [in .-value] (cell= (pr-str val))))))))
 
 (defn send-field+ [ctor]
-  (fn [{label :label submit' :submit :as attrs} elems]
+  (fn [{label :label submit :submit :as attrs} elems]
     (with-let [e (ctor (dissoc attrs :label :submit) elems)]
       (->> (bound-fn [_]
-             (->> ((or submit' @*submit* identity) (clean @*data*))
-                  (reset! *data*)))
+             (if submit
+               (reset! *data* (-> @*data* clean not-empty submit))
+               (@*submit*)))
            (.addEventListener (mid e) "click"))
       (bind-in! e [in .-type] "button")
       (bind-in! e [in .-value] label))))
