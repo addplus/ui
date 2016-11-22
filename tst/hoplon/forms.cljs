@@ -50,6 +50,14 @@
               (hui/radio+ :s 14 :key key :val val)
               label-content))
 
+(defn radio [ns key val label]
+  (let [k (keyword ns key)
+        v (keyword (str (name ns) "." (name key)) val)]
+    (hui/label+ :sh (r 1 1) :p p :gh g :av :mid
+                :c (c 128 128 128 0.1)
+                (hui/radio+ :s 14 :key k :val v)
+                label)))
+
 (defc form1-default {:amt         "123"
                      :select      {:single   nil
                                    :multiple nil}
@@ -121,15 +129,23 @@
 
       ;(row "Radio button group 1")
       (row :p (* 2 p) :g g :b 1 :bc transparent-grey
-           (radio+label :key :animal/type :val :animal.type/cat "Cat")
-           (radio+label :key :animal/type :val :animal.type/dog "Dog")
-           (radio+label :key :animal/type :val :animal.type/bat "Bat"))
+           (radio+label :key :animal/type :val :animal.type/ant "Ant")
+           (radio+label :key :animal/type :val :animal.type/bat "Bat")
+           (radio+label :key :animal/type :val :animal.type/cat "Cat"))
 
       ;(row "Radio button group 2")
       (row :p (* 2 p) :g g :b 1 :bc transparent-grey
-           (radio+ :key :tree/type :val :tree.type/cat "Apple")
-           (radio+ :key :tree/type :val :tree.type/dog "Pineapple")
-           (radio+ :key :tree/type :val :tree.type/bat "Durian")))))
+           (radio+ :key :tree/type :val :tree.type/apple "Apple")
+           (radio+ :key :tree/type :val :tree.type/pineapple
+                   (elem :f (em 2) "Pine " (h/i "apple")))
+           (radio+ :key :tree/type :val :tree.type/durian "Durian"))
+
+      (let [opt (partial radio :marital :status)]
+        (row :p (* 2 p) :g g :b 1 :bc transparent-grey
+             (opt :single "Single")
+             (opt :married "Married")
+             (opt :divorced "Divorced")
+             (opt :widowed "Widowed"))))))
 
 (defn page []
   (window
