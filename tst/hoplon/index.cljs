@@ -2,11 +2,13 @@
   (:require
     [hoplon.demo]
     [hoplon.ui-test]
-    [hoplon.forms]))
+    [hoplon.forms]
+    [hoplon.perf]))
 
 (defn page []
   ;(hoplon.demo/page)
   ;(hoplon.ui-test/page)
-  (hoplon.forms/page))
+  ;(hoplon.forms/page)
+  (hoplon.perf/page))
 
 (page)
