@@ -234,17 +234,6 @@
       (with-let [e (ctor (dissoc attrs :g :gh :gv) elems)]
         (bind-in! e [in .-style .-margin] pv ph)))))
 
-(defn nudge [ctor]
-  "bump the position of an elem relative to its normal position in the layout.
-   useful as a final tweak in cases where the correctly calculated position of
-   an element may appear off visually.
-
-   implemented by setting the margins on the elem's outer element."
-  (fn [{:keys [nh nv] :as attrs} elems]
-    {:pre [(lengths? nh nv)]}
-    (with-let [e (ctor (dissoc attrs :nh :nv) elems)]
-      (bind-in! e [out .-style .-margin] (or nv 0) (or (cell= (- nh)) 0) (or (cell= (- nv)) 0) (or nh 0)))))
-
 (defn dock [ctor]
   "fix the element to the window."
   (fn [{:keys [xl xr xt xb] :as attrs} elems]
@@ -626,7 +615,7 @@
 
 ;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def leaf (comp shadow round border nudge size dock fontable color transform clickable))
+(def leaf (comp shadow round border size dock fontable color transform clickable))
 (def node (comp align pad gutter leaf))
 
 ;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -661,11 +650,10 @@
   "Set up a form context."
   [ctor]
   (fn [{:keys [change submit default] :as attrs} elems]
-    (reset! *submit* submit)
     (let [default-cell (cell= (clean default))
           reset-data! (partial reset! *data*)
           submit! #(reset-data! (or (-> @*data* clean not-empty submit)
-                                      @default-cell))]
+                                    @default-cell))]
 
       ; Form-level submit action for submit fields to use as default action
       (reset! *submit* (if submit submit! cant-submit))
