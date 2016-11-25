@@ -4,7 +4,7 @@
   `(set! ~(reduce #(list %2 %1) elem path) (hoplon.ui.attrs/->attr ~value)))
 
 (defmacro bind-in! [elem path value]
-  `(set-in! ~elem ~path (if (javelin.core/cell? ~value) @(add-watch ~value (gensym) #(set-in! ~elem ~path %4)) ~value)))
+  `(bind-with (fn [v#] (set-in! ~elem ~path v#)) ~value))
 
 (defmacro cmpt [& args]
   `(hoplon.binding/binding [hoplon.ui/*pointer* (javelin.core/cell {:over 0 :down 0 :up 0 :out 0})

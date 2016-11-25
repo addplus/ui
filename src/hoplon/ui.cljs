@@ -13,7 +13,7 @@
   (:require-macros
     [hoplon.core    :refer [with-timeout]]
     [hoplon.binding :refer [binding bound-fn]]
-    [hoplon.ui      :refer [bind-in! set-in!]]
+    [hoplon.ui      :refer [set-in! bind-in!]]
     [javelin.core   :refer [cell= with-let set-cell!=]]))
 
 ;;; constants ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -77,6 +77,9 @@
   (when *exceptions*
     (swap! *exceptions* conj {:msg (apply str msg)})
     (throw (js/Error (apply str msg)))))
+
+(defn bind-with [f value]
+  (f (if (cell? value) @(add-watch value (gensym) #(f %4)) value)))
 
 (defn vstr [vs]
   (join " " (mapv ->attr vs)))
@@ -237,18 +240,6 @@
         (bind-in! e [in .-style .-marginRight]  ph)
         (bind-in! e [in .-style .-marginTop]    pv)
         (bind-in! e [in .-style .-marginBottom] pv)))))
-
-(defn dock [ctor]
-  "fix the element to the window."
-  (fn [{:keys [xl xr xt xb] :as attrs} elems]
-    {:pre [(docks? xl xr xt xb)]} ;; todo: warn about pct w, pct h
-    (with-let [e (ctor (dissoc attrs :xl :xr :xt :xb) elems)]
-      (bind-in! e [out .-style .-position] (cell= (if (or xl xr xt xb) :fixed :initial)))
-      (bind-in! e [out .-style .-zIndex]   (cell= (if (or xl xr xt xb) "9999" :initial)))
-      (bind-in! e [out .-style .-left]     (cell= (or xl nil)))
-      (bind-in! e [out .-style .-right]    (cell= (or xr nil)))
-      (bind-in! e [out .-style .-top]      (cell= (or xt nil)))
-      (bind-in! e [out .-style .-bottom]   (cell= (or xb nil))))))
 
 (defn color [ctor]
   "set the background color an the inner element."
@@ -609,6 +600,18 @@
             (h/for-tpl [f fonts]   (h/style f))
             (h/for-tpl [s styles]  (h/link :rel "stylesheet" :href s))
             (h/for-tpl [s scripts] (h/script :src s)))))))
+
+(defn dock [ctor]
+  "fix the element to the window."
+  (fn [{:keys [xl xr xt xb] :as attrs} elems]
+    {:pre [(docks? xl xr xt xb)]} ;; todo: warn about pct w, pct h
+    (with-let [e (ctor (dissoc attrs :xl :xr :xt :xb) elems)]
+      (bind-in! e [out .-style .-position] (cell= (if (or xl xr xt xb) :fixed :initial)))
+      (bind-in! e [out .-style .-zIndex]   (cell= (if (or xl xr xt xb) "9999" :initial)))
+      (bind-in! e [out .-style .-left]     (cell= (or xl nil)))
+      (bind-in! e [out .-style .-right]    (cell= (or xr nil)))
+      (bind-in! e [out .-style .-top]      (cell= (or xt nil)))
+      (bind-in! e [out .-style .-bottom]   (cell= (or xb nil))))))
 
 ;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
