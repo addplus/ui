@@ -413,9 +413,9 @@
       (.addEventListener (mid e) "mousedown" (bound-fn [] (if (= *state* :on) nil #_(reset! *selected* val)))))))
 
 (defn line-field [ctor]
-  (fn [{:keys [rows cols autocomplete autocapitalize content prompt charsize charmin charmax resizable] :as attrs} elems]
+  (fn [{:keys [rows cols autocomplete autocapitalize content prompt disabled charsize charmin charmax resizable] :as attrs} elems]
     {:pre [(autocompletes? autocomplete) (autocapitalizes? autocapitalize) (contents? content) (integers? charsize charmin charmax)]}
-    (with-let [e (ctor (dissoc attrs :rows :cols :autocomplete :autocapitalize :content :prompt :charsize :charmin :charmax :resizeable) elems)]
+    (with-let [e (ctor (dissoc attrs :rows :cols :autocomplete :autocapitalize :content :prompt :disabled :charsize :charmin :charmax :resizeable) elems)]
       (bind-in! e [in .-style .-padding] "0")
       (bind-in! e [in .-rows]            (cell= (if rows (str rows) "1")))
       (bind-in! e [in .-style .-height]  (cell= (if rows nil "100%")))
@@ -424,6 +424,7 @@
       (bind-in! e [in .-style .-resize]  (cell= (or resizable :none)))
       (bind-in! e [in .-type]            content)
       (bind-in! e [in .-placeholder]     prompt)
+      (bind-in! e [in .-disabled] disabled)
       (bind-in! e [in .-autocomplete]    autocomplete)
       (bind-in! e [in .-autocapitalize]  autocapitalize)
 
