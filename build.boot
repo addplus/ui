@@ -17,7 +17,7 @@
   :test-paths   #{"tst"}
   :dependencies '[[boot/core                 "2.6.0"]
                   [onetom/boot-lein-generate "0.1.3"          :scope "test"]
-                  [org.clojure/clojure       "1.9.0-alpha13"  :scope "provided"]
+                  [org.clojure/clojure       "1.9.0-alpha14"  :scope "provided"]
                   [org.clojure/clojurescript "1.9.293"        :scope "provided"]
                   [adzerk/boot-cljs          "1.7.228-2"      :scope "test"]
                   [adzerk/boot-reload        "0.4.12"         :scope "test"]

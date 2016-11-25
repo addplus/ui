@@ -4,6 +4,7 @@
     [javelin.core :as j :refer [defc defc= cell= cell cell-let with-let]]
     [hoplon.core :as h :refer [defelem for-tpl when-tpl if-tpl case-tpl]]
     [hoplon.ui :as hui :refer [window elem bind-in!]]
+    [hoplon.ui.plus :as hui+]
     [hoplon.ui.attrs :refer [c r d em px]]
     [hoplon.ui.elems :refer [in]]))
 
@@ -31,11 +32,12 @@
   (with-let [e' (elem a e)]
     (bind-in! e' [in .-style .-whiteSpace] "pre-wrap")))
 
-(defelem line+ [a e] (hui/line+ :f 12 :p p :b 1 :bc transparent-grey a e))
-(defelem select+ [a e] (hui/select+ :p p :b 1 :bc transparent-grey a e))
+(defelem line+ [a e] (hui+/line :f 12 :p p :b 1 :bc transparent-grey a e))
+(defelem lines+ [a e] (hui+/lines :f 12 :p p :b 1 :bc transparent-grey a e))
+(defelem select+ [a e] (hui+/select :p p :b 1 :bc transparent-grey a e))
 
 (defelem radio+label [{:keys [key val] :as attrs} [label-content]]
-  (let [radio (hui/radio+ :s 14 :key key :val val)
+  (let [radio (hui+/radio :s 14 :key key :val val)
         label (h/label label-content)
         id# (str (gensym "radio"))]
     (set! (.-id (in radio)) id#)
@@ -45,17 +47,17 @@
          label)))
 
 (defelem radio+ [{:keys [key val] :as attrs} [label-content]]
-  (hui/label+ :sh (r 1 1) :p p :gh g :av :mid
+  (hui+/label :sh (r 1 1) :p p :gh g :av :mid
               :c (c 128 128 128 0.1) (dissoc attrs :key :val)
-              (hui/radio+ :s 14 :key key :val val)
+              (hui+/radio :s 14 :key key :val val)
               label-content))
 
 (defn radio [ns key val label]
   (let [k (keyword ns key)
         v (keyword (str (name ns) "." (name key)) val)]
-    (hui/label+ :sh (r 1 1) :p p :gh g :av :mid
+    (hui+/label :sh (r 1 1) :p p :gh g :av :mid
                 :c (c 128 128 128 0.1)
-                (hui/radio+ :s 14 :key k :val v)
+                (hui+/radio :s 14 :key k :val v)
                 label)))
 
 (defc form1-default {:amt         "123"
@@ -64,16 +66,16 @@
                      :animal/type nil})
 
 #_(h/with-timeout 3000
-    (reset! form1-default {:amt    "999"
-                           :select {:single :option-2}}))
+                  (reset! form1-default {:amt    "999"
+                                         :select {:single :option-2}}))
 
 (defn form1 []
-  (hui/form+
+  (hui+/form
     :sh (r 1 1) :ph (r 1 10) :g g :av :top
     :default form1-default
     :submit #(do
-               (js/console.debug "form1-data" %)
-               {:amt "<submission>"})
+              (js/console.debug "form1-data" %)
+              {:amt "<submission>"})
     :change #(js/console.info "form change" %)
 
     (elem
@@ -92,7 +94,11 @@
              :key :amt
              :autofocus true)
 
-      (hui/write+ :label "Submit & Reset"
+      (lines+ :sh (r 1 1) :sv (em 4) :rows 4
+              :key :desc
+              :resizeable true)
+
+      (hui+/write :label "Submit & Reset"
                   :sh (r 1 1)
                   :p p
                   :ah :mid
