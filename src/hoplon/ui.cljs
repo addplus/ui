@@ -541,7 +541,7 @@
 (defn dock [ctor]
   "fix the element to the window."
   (fn [{:keys [xl xr xt xb] :as attrs} elems]
-    {:pre [(docks? xl xr xt xb)]} ;; todo: warn about pct w, pct h
+    ;{:pre [(docks? xl xr xt xb)]} ;; todo: warn about pct w, pct h
     (with-let [e (ctor (dissoc attrs :xl :xr :xt :xb) elems)]
       (bind-in! e [out .-style .-position] (cell= (if (or xl xr xt xb) :fixed :initial)))
       (bind-in! e [out .-style .-zIndex]   (cell= (if (or xl xr xt xb) "9999" :initial)))
@@ -552,7 +552,7 @@
 
 ;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def leaf (comp shadow round border size fontable color transform clickable))
+(def leaf (comp shadow round border size #_dock fontable color transform clickable))
 (def node (comp align pad gutter leaf))
 
 ;;; element primitives ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -614,7 +614,6 @@
   "Set the properties common to all form inputs."
   [ctor]
   (fn [{:keys [key val req autofocus] :as attrs} elems]
-    (when val (throw-ui-exception "The :val attribute is NOT IMPLEMENTED YET"))
     (let [ks (cell= (if (vector? key) key [key]))]
       (with-let [e (ctor (dissoc attrs :key :val :req :autofocus :debounce) elems)]
         (let [field (in e)
@@ -678,7 +677,6 @@
 
 (defn select-field+ [ctor]
   (fn [{:keys [key multi? req autofocus rows size] :as attrs} option-kids]
-    (when (or rows size) (throw-ui-exception "Use :sv instead"))
     (let [ks (cell= (if (vector? key) key [key]))]
       (with-let [e (ctor (dissoc attrs :key :multi? :req :autofocus :debounce :rows :size) option-kids)]
         (let [field (in e)
