@@ -2,6 +2,7 @@
   (:refer-clojure
     :exclude [integer?])
   (:require
+    [javelin.core :refer [cell= with-let]]
     [hoplon.ui.attrs :as a]))
 
 ;;; constants ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
