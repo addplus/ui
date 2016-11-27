@@ -26,7 +26,7 @@
                   [hoplon/hoplon             "6.0.0-alpha17"]
                   [cljsjs/markdown           "0.6.0-beta1-0"]
 
-                  [binaryage/devtools "0.8.2"                 :scope "test"]
+                  [binaryage/devtools "0.8.3" :scope "test"]
                   [binaryage/dirac "0.8.4"                    :scope "test"]
                   [powerlaces/boot-cljs-devtools "0.1.2"      :scope "test"]]
   :repositories  [["clojars"       "https://clojars.org/repo/"]
@@ -83,7 +83,8 @@
     (comp (watch) (speak) (hoplon) (reload)
           (cljs-devtools)
           (cljs :optimizations o
-                :compiler-options {:elide-asserts elide-asserts})
+                :compiler-options (-> #'cljs meta :task-options :compiler-options
+                                      (assoc :elide-asserts elide-asserts)))
           (serve))))
 
 (task-options!

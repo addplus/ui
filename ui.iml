@@ -18,7 +18,7 @@
     <orderEntry type="library" name="Leiningen: adzerk/boot-reload:0.4.13" level="project" />
     <orderEntry type="library" name="Leiningen: adzerk/bootlaces:0.1.13" level="project" />
     <orderEntry type="library" name="Leiningen: args4j:2.0.26" level="project" />
-    <orderEntry type="library" name="Leiningen: binaryage/devtools:0.8.2" level="project" />
+    <orderEntry type="library" name="Leiningen: binaryage/devtools:0.8.3" level="project" />
     <orderEntry type="library" name="Leiningen: binaryage/dirac:0.8.4" level="project" />
     <orderEntry type="library" name="Leiningen: binaryage/env-config:0.1.1" level="project" />
     <orderEntry type="library" name="Leiningen: binaryage/oops:0.5.2" level="project" />
