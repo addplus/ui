@@ -3,8 +3,8 @@
     [cljs.pprint :as pp]
     [javelin.core :as j :refer [defc defc= cell= cell cell-let with-let]]
     [hoplon.core :as h :refer [defelem for-tpl when-tpl if-tpl case-tpl]]
-    [hoplon.ui :refer [window elem bind-in!
-                       node parse-args destyle line-field vstr]]
+    [hoplon.ui :as hui :refer [window elem bind-in!
+                               node parse-args destyle line-field vstr]]
     [hoplon.ui.attrs :refer [c r d em px]]
     [hoplon.ui.elems :refer [box doc out mid in elem?]]))
 
@@ -13,7 +13,6 @@
 
 (defn fieldable [ctor]
   (fn [{:keys [model key] :as attrs} elems]
-    (js/console.log "fieldable" model key)
     (with-let [e (ctor (dissoc attrs :model :key) elems)]
       (let [{:keys [data]} model
             update-form-machine #(swap! data assoc key (.. (in e) -value))]

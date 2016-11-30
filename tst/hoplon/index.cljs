@@ -4,8 +4,8 @@
     [hoplon.forms]
     ;[forms.chains]
     ;[forms.conditional]
-    [forms.defaults]
-    ;[forms.submit]
+    ;[forms.defaults]
+    [forms.submit]
     ;[forms.types]
     ;[forms.updates]
     ;[forms.validation]
@@ -16,8 +16,8 @@
   ;(hoplon.ui-test/page)
   ;(forms.chains/page)
   ;(forms.conditional/page)
-  (forms.defaults/page)
-  ;(forms.submit/page)
+  ;(forms.defaults/page)
+  (forms.submit/page)
   ;(forms.types/page)
   ;(forms.updates/page)
   ;(forms.validation/page)
