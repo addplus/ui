@@ -6,19 +6,21 @@
     ;[forms.conditional]
     ;[forms.defaults]
     ;[forms.submit]
-    [forms.types]
+    ;[forms.types]
     ;[forms.updates]
-    ;[forms.validation]
+    [forms.validation]
+    [hoplon.sandbox]
     ))
 
 (defn page []
   ;(hoplon.demo/page)
   ;(hoplon.ui-test/page)
+  (hoplon.sandbox/page)
   ;(forms.chains/page)
   ;(forms.conditional/page)
   ;(forms.defaults/page)
   ;(forms.submit/page)
-  (forms.types/page)
+  ;(forms.types/page)
   ;(forms.updates/page)
   ;(forms.validation/page)
   ;(hoplon.forms/page)
