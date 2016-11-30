@@ -294,7 +294,9 @@
     {:pre [(lengths? b bh bv bl br bt bb) (colors? bc bch bcv bcl bcr bct bcb)]}
     (with-let [e (ctor (dissoc attrs :b :bh :bv :bl :br :bt :bb :bw :bc :bch :bcv :bcl :bcr :bct :bcb) elems)]
       (bind-in! e [mid .-style .-borderWidth] (or bt bv b 0)  (or br bh b 0)  (or bb bv b 0)  (or bl bh b 0))
-      (bind-in! e [mid .-style .-borderColor] (or bct bcv bc "transparent") (or bcr bch bc "transparent") (or bcb bcv bc "transparent") (or bcl bch bc "transparent"))
+      (bind-in! e [mid .-style .-borderColor] bc bc bc bc
+                ;(or bct bcv bc "transparent") (or bcr bch bc "transparent") (or bcb bcv bc "transparent") (or bcl bch bc "transparent")
+                )
       (bind-in! e [mid .-style .-borderStyle] :solid))))
 
 (defn fontable [ctor]
