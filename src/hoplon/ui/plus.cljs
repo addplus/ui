@@ -1,11 +1,11 @@
 (ns hoplon.ui.plus
   (:refer-clojure :exclude [binding bound-fn])
   (:require
-    [hoplon.core :as h]
+    [hoplon.core :as h :refer [defelem for-tpl when-tpl if-tpl case-tpl]]
     [clojure.string :refer [blank? join split ends-with?]]
     [cljs.reader :refer [read-string]]
     [javelin.core :refer [cell cell?]]
-    [hoplon.ui :refer [clean *data* *submit* throw-ui-exception bind-with debounce
+    [hoplon.ui :refer [elem clean *data* *submit* throw-ui-exception bind-with debounce
                        autocapitalizes? autocompletes? contents? integers?
                        node parse-args destyle line-field vstr]]
     [hoplon.ui.attrs :refer [r em ratio? calc? ->attr]]
@@ -227,3 +227,6 @@
 (def toggle (-> h/input box destyle toggleable node parse-args))
 (def radio (-> h/input box destyle radioable node parse-args))
 (def select (-> h/select box destyle select-field node parse-args))
+
+(defelem row [attrs elems] (elem :sh (r 1 1) attrs elems))
+(defelem container [attrs elems] (elem :s (r 1 1) attrs elems))
