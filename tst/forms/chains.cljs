@@ -50,3 +50,5 @@
         ::done (row (cell= (str "Form submitted: " submitted))))
       (elem :sh (r 1 1)
             (cell= (str "Form model: " data))))))
+
+; TODO Restrict upcoming steps if previous steps are not validated yet.
