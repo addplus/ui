@@ -32,7 +32,7 @@
 (defn route->hash [[path & [qmap]]]
   "transforms a urlstate of the form [[\"foo\" \"bar\"] {:baz \"barf\"}]
    to hash string in the form \"foo/bar&baz=barf\""
-  (let [pair (fn [[k v]] (str (name k) "=" (js/encodeURI (pr-str v))))
+  (let [pair (fn [[k v]] (str (name k) "=" (js/encodeURIComponent (pr-str v))))
         pstr (when (not-empty path) (apply str "/" (interpose "/" (map name path))))
         qstr (when (not-empty qmap) (apply str "?" (interpose "&" (map pair qmap))))]
     (str pstr qstr)))
@@ -42,7 +42,7 @@
    [[\"foo\" \"bar\"] {:baz \"barf\"}]"
   (let [[rstr qstr] (split (subs hash 1) #"\?")
         pair        #(let [[k v] (split % #"=" 2)]
-                          [(keyword k) (read-string (js/decodeURI v))])
+                       [(keyword k) (read-string (js/decodeURIComponent v))])
         qmap        (->> (split qstr #"&") (map pair) (when (not-empty qstr)) (into {}))
         path        (->> (split rstr #"/") (remove empty?) (mapv keyword))]
     (vec [path qmap])))

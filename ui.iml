@@ -8,17 +8,16 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/dev-resources" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/test" isTestSource="true" />
-      <sourceFolder url="file://$MODULE_DIR$/tst" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/out" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Leiningen: adzerk/boot-cljs:1.7.228-2" level="project" />
-    <orderEntry type="library" name="Leiningen: adzerk/boot-reload:0.4.12" level="project" />
+    <orderEntry type="library" name="Leiningen: adzerk/boot-reload:0.4.13" level="project" />
     <orderEntry type="library" name="Leiningen: adzerk/bootlaces:0.1.13" level="project" />
     <orderEntry type="library" name="Leiningen: args4j:2.0.26" level="project" />
-    <orderEntry type="library" name="Leiningen: binaryage/devtools:0.8.2" level="project" />
+    <orderEntry type="library" name="Leiningen: binaryage/devtools:0.8.3" level="project" />
     <orderEntry type="library" name="Leiningen: binaryage/dirac:0.8.4" level="project" />
     <orderEntry type="library" name="Leiningen: binaryage/env-config:0.1.1" level="project" />
     <orderEntry type="library" name="Leiningen: binaryage/oops:0.5.2" level="project" />
